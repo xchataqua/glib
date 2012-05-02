@@ -49,8 +49,8 @@ typedef unsigned int guint32;
 #define G_GUINT32_FORMAT "u"
 #define G_HAVE_GINT64 1          /* deprecated, always true */
 
-typedef signed long gint64;
-typedef unsigned long guint64;
+typedef signed long long gint64;
+typedef unsigned long long guint64;
 
 #define G_GINT64_CONSTANT(val)	(val##L)
 #define G_GUINT64_CONSTANT(val)	(val##UL)
