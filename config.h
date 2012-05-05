@@ -16,6 +16,8 @@
 /* poll doesn't work on devices */
 #define BROKEN_POLL 1
 
+#include <Availability.h>
+
 /* Define to one of `_getb67', `GETB67', `getb67' for Cray-2 and Cray-YMP
    systems. This function is required for `alloca.c' support on those systems.
    */
@@ -97,7 +99,9 @@
 #define HAVE_C99_VSNPRINTF 1
 
 /* define to 1 if Carbon is available */
-#define HAVE_CARBON 1
+#ifndef __IPHONE_OS_VERSION_MIN_REQUIRED
+# define HAVE_CARBON 1
+#endif
 
 /* Define to 1 if you have the `chown' function. */
 #define HAVE_CHOWN 1
@@ -112,7 +116,9 @@
 #define HAVE_CODESET 1
 
 /* Define to 1 if you have the <crt_externs.h> header file. */
-#define HAVE_CRT_EXTERNS_H 1
+#ifndef __IPHONE_OS_VERSION_MIN_REQUIRED
+# define HAVE_CRT_EXTERNS_H 1
+#endif
 
 /* Define if dbus-1 is available */
 /* #undef HAVE_DBUS1 */
@@ -622,7 +628,9 @@
 #define HAVE_XLOCALE_H 1
 
 /* Define to 1 if you have the `_NSGetEnviron' function. */
-#define HAVE__NSGETENVIRON 1
+#ifndef __IPHONE_OS_VERSION_MIN_REQUIRED
+# define HAVE__NSGETENVIRON 1
+#endif
 
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
