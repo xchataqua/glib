@@ -178,7 +178,7 @@ test_interface_method_call (GDBusConnection       *connection,
 
       error = NULL;
 
-      fd = open (path, O_RDONLY);
+      fd = g_open (path, O_RDONLY, 0);
       g_unix_fd_list_append (fd_list, fd, &error);
       g_assert_no_error (error);
       close (fd);
@@ -1801,7 +1801,6 @@ main (int   argc,
   GDBusNodeInfo *introspection_data = NULL;
   gchar *tmpdir = NULL;
 
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
 
   introspection_data = g_dbus_node_info_new_for_xml (test_interface_introspection_xml, NULL);

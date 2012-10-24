@@ -1,4 +1,5 @@
 #include <gio/gio.h>
+#include <string.h>
 
 static void
 test_guess (void)
@@ -6,7 +7,7 @@ test_guess (void)
   gchar *res;
   gchar *expected;
   gboolean uncertain;
-  guchar *data = (guchar*)
+  guchar data[] =
     "[Desktop Entry]\n"
     "Type=Application\n"
     "Name=appinfo-test\n"
@@ -26,42 +27,59 @@ test_guess (void)
   g_free (res);
   g_free (expected);
 
-  res = g_content_type_guess ("foo.desktop", data, -1, &uncertain);
+  res = g_content_type_guess ("foo.desktop", data, sizeof (data) - 1, &uncertain);
   expected = g_content_type_from_mime_type ("application/x-desktop");
   g_assert (g_content_type_equals (expected, res));
   g_assert (!uncertain);
   g_free (res);
   g_free (expected);
 
-  res = g_content_type_guess ("foo.txt", data, -1, &uncertain);
+  res = g_content_type_guess ("foo.txt", data, sizeof (data) - 1, &uncertain);
   expected = g_content_type_from_mime_type ("text/plain");
   g_assert (g_content_type_equals (expected, res));
   g_assert (!uncertain);
   g_free (res);
   g_free (expected);
 
-  res = g_content_type_guess ("foo", data, -1, &uncertain);
+  res = g_content_type_guess ("foo", data, sizeof (data) - 1, &uncertain);
   expected = g_content_type_from_mime_type ("text/plain");
   g_assert (g_content_type_equals (expected, res));
   g_assert (!uncertain);
   g_free (res);
   g_free (expected);
 
-  res = g_content_type_guess (NULL, data, -1, &uncertain);
+  res = g_content_type_guess (NULL, data, sizeof (data) - 1, &uncertain);
   expected = g_content_type_from_mime_type ("application/x-desktop");
   g_assert (g_content_type_equals (expected, res));
   g_assert (!uncertain);
   g_free (res);
   g_free (expected);
 
-  res = g_content_type_guess ("test.pot", (guchar *)"ABC abc", -1, &uncertain);
+  /* this is potentially ambiguous: it does not match the PO template format,
+   * but looks like text so it can't be Powerpoint */
+  res = g_content_type_guess ("test.pot", (guchar *)"ABC abc", 7, &uncertain);
+  expected = g_content_type_from_mime_type ("text/x-gettext-translation-template");
+  g_assert (g_content_type_equals (expected, res));
+  g_assert (!uncertain);
+  g_free (res);
+  g_free (expected);
+
+  res = g_content_type_guess ("test.pot", (guchar *)"msgid \"", 7, &uncertain);
+  expected = g_content_type_from_mime_type ("text/x-gettext-translation-template");
+  g_assert (g_content_type_equals (expected, res));
+  g_assert (!uncertain);
+  g_free (res);
+  g_free (expected);
+
+  res = g_content_type_guess ("test.pot", (guchar *)"\xCF\xD0\xE0\x11", 4, &uncertain);
   expected = g_content_type_from_mime_type ("application/vnd.ms-powerpoint");
   g_assert (g_content_type_equals (expected, res));
-  g_assert (uncertain);
+  /* we cannot reliably detect binary powerpoint files as long as there is no
+   * defined MIME magic, so do not check uncertain here */
   g_free (res);
   g_free (expected);
 
-  res = g_content_type_guess ("test.otf", (guchar *)"OTTO", -1, &uncertain);
+  res = g_content_type_guess ("test.otf", (guchar *)"OTTO", 4, &uncertain);
   expected = g_content_type_from_mime_type ("application/x-font-otf");
   g_assert (g_content_type_equals (expected, res));
   g_assert (!uncertain);
@@ -185,8 +203,6 @@ test_icon (void)
 int
 main (int argc, char *argv[])
 {
-  g_type_init ();
-
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/contenttype/guess", test_guess);

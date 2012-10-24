@@ -108,6 +108,13 @@ void    g_test_add_func                 (const char     *testpath,
 void    g_test_add_data_func            (const char     *testpath,
                                          gconstpointer   test_data,
                                          GTestDataFunc   test_func);
+
+GLIB_AVAILABLE_IN_2_34
+void    g_test_add_data_func_full       (const char     *testpath,
+                                         gpointer        test_data,
+                                         GTestDataFunc   test_func,
+                                         GDestroyNotify  data_free_func);
+
 /* tell about failure */
 void    g_test_fail                     (void);
 
@@ -295,6 +302,16 @@ typedef gboolean        (*GTestLogFatalFunc)    (const gchar    *log_domain,
 void
 g_test_log_set_fatal_handler            (GTestLogFatalFunc log_func,
                                          gpointer          user_data);
+
+void    g_test_expect_message                    (const gchar    *log_domain,
+                                                  GLogLevelFlags  log_level,
+                                                  const gchar    *pattern);
+void    g_test_assert_expected_messages_internal (const char     *domain,
+                                                  const char     *file,
+                                                  int             line,
+                                                  const char     *func);
+
+#define g_test_assert_expected_messages() g_test_assert_expected_messages_internal (G_LOG_DOMAIN, __FILE__, __LINE__, G_STRFUNC)
 
 G_END_DECLS
 

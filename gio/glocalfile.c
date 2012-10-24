@@ -414,6 +414,23 @@ g_local_file_get_parse_name (GFile *file)
     }
   else
     {
+#ifdef G_OS_WIN32
+      char *dup_filename, *p, *backslash;
+
+      /* Turn backslashes into forward slashes like
+       * g_filename_to_uri() would do (but we can't use that because
+       * it doesn't output IRIs).
+       */
+      dup_filename = g_strdup (filename);
+      filename = p = dup_filename;
+
+      while ((backslash = strchr (p, '\\')) != NULL)
+	{
+	  *backslash = '/';
+	  p = backslash + 1;
+	}
+#endif
+
       escaped_path = g_uri_escape_string (filename,
 					  G_URI_RESERVED_CHARS_ALLOWED_IN_PATH_ELEMENT "/",
 					  TRUE);
@@ -423,7 +440,9 @@ g_local_file_get_parse_name (GFile *file)
 				NULL);
       
       g_free (escaped_path);
-
+#ifdef G_OS_WIN32
+      g_free (dup_filename);
+#endif
       if (free_utf8_filename)
 	g_free (utf8_filename);
     }
@@ -1998,7 +2017,7 @@ g_local_file_trash (GFile         *file,
     infofile = g_build_filename (infodir, infoname, NULL);
     g_free (infoname);
 
-    fd = open (infofile, O_CREAT | O_EXCL, 0666);
+    fd = g_open (infofile, O_CREAT | O_EXCL, 0666);
   } while (fd == -1 && errno == EEXIST);
 
   g_free (basename);

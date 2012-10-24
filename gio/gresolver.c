@@ -30,6 +30,7 @@
 #include "ginetaddress.h"
 #include "ginetsocketaddress.h"
 #include "gsimpleasyncresult.h"
+#include "gtask.h"
 #include "gsrvtarget.h"
 #include "gthreadedresolver.h"
 
@@ -146,8 +147,6 @@ g_resolver_real_lookup_service_finish (GResolver            *resolver,
 static void
 g_resolver_class_init (GResolverClass *resolver_class)
 {
-  volatile GType type;
-
   /* Automatically pass these over to the lookup_records methods */
   resolver_class->lookup_service = g_resolver_real_lookup_service;
   resolver_class->lookup_service_async = g_resolver_real_lookup_service_async;
@@ -156,8 +155,7 @@ g_resolver_class_init (GResolverClass *resolver_class)
   g_type_class_add_private (resolver_class, sizeof (GResolverPrivate));
 
   /* Make sure _g_networking_init() has been called */
-  type = g_inet_address_get_type ();
-  (type); /* To avoid -Wunused-but-set-variable */
+  g_type_ensure (G_TYPE_INET_ADDRESS);
 
   /* Initialize _g_resolver_addrinfo_hints */
 #ifdef AI_ADDRCONFIG
@@ -398,15 +396,13 @@ g_resolver_lookup_by_name_async (GResolver           *resolver,
   addr = g_inet_address_new_from_string (hostname);
   if (addr)
     {
-      GSimpleAsyncResult *simple;
+      GTask *task;
 
-      simple = g_simple_async_result_new (G_OBJECT (resolver),
-                                          callback, user_data,
-                                          g_resolver_lookup_by_name_async);
-
-      g_simple_async_result_set_op_res_gpointer (simple, addr, g_object_unref);
-      g_simple_async_result_complete_in_idle (simple);
-      g_object_unref (simple);
+      task = g_task_new (resolver, cancellable, callback, user_data);
+      g_task_set_source_tag (task, g_resolver_lookup_by_name_async);
+      g_task_return_pointer (task, g_list_append (NULL, addr),
+                             (GDestroyNotify) g_resolver_free_addresses);
+      g_object_unref (task);
       return;
     }
 
@@ -448,21 +444,12 @@ g_resolver_lookup_by_name_finish (GResolver     *resolver,
 
   g_return_val_if_fail (G_IS_RESOLVER (resolver), NULL);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
+  if (g_async_result_legacy_propagate_error (result, error))
+    return NULL;
+  else if (g_async_result_is_tagged (result, g_resolver_lookup_by_name_async))
     {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-
-      if (g_simple_async_result_propagate_error (simple, error))
-        return NULL;
-
       /* Handle the stringified-IP-addr case */
-      if (g_simple_async_result_get_source_tag (simple) == g_resolver_lookup_by_name_async)
-        {
-          GInetAddress *addr;
-
-          addr = g_simple_async_result_get_op_res_gpointer (simple);
-          return g_list_append (NULL, g_object_ref (addr));
-        }
+      return g_task_propagate_pointer (G_TASK (result), error);
     }
 
   addrs = G_RESOLVER_GET_CLASS (resolver)->
@@ -584,13 +571,8 @@ g_resolver_lookup_by_address_finish (GResolver     *resolver,
 {
   g_return_val_if_fail (G_IS_RESOLVER (resolver), NULL);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-
-      if (g_simple_async_result_propagate_error (simple, error))
-        return NULL;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return NULL;
 
   return G_RESOLVER_GET_CLASS (resolver)->
     lookup_by_address_finish (resolver, result, error);
@@ -744,13 +726,8 @@ g_resolver_lookup_service_finish (GResolver     *resolver,
 {
   g_return_val_if_fail (G_IS_RESOLVER (resolver), NULL);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-
-      if (g_simple_async_result_propagate_error (simple, error))
-        return NULL;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return NULL;
 
   return G_RESOLVER_GET_CLASS (resolver)->
     lookup_service_finish (resolver, result, error);
@@ -892,12 +869,7 @@ g_resolver_lookup_records_finish (GResolver     *resolver,
  *
  * Since: 2.22
  */
-GQuark
-g_resolver_error_quark (void)
-{
-  return g_quark_from_static_string ("g-resolver-error-quark");
-}
-
+G_DEFINE_QUARK (g-resolver-error-quark, g_resolver_error)
 
 static GResolverError
 g_resolver_error_from_addrinfo_error (gint err)
@@ -997,18 +969,47 @@ _g_resolver_name_from_nameinfo (GInetAddress  *address,
 }
 
 #if defined(G_OS_UNIX)
+
+static gboolean
+parse_short (guchar  **p,
+             guchar   *end,
+             guint16  *value)
+{
+  if (*p + 2 > end)
+    return FALSE;
+  GETSHORT (*value, *p);
+  return TRUE;
+}
+
+static gboolean
+parse_long (guchar  **p,
+            guchar   *end,
+            guint32  *value)
+{
+  if (*p + 4 > end)
+    return FALSE;
+  GETLONG (*value, *p);
+  return TRUE;
+}
+
 static GVariant *
 parse_res_srv (guchar  *answer,
                guchar  *end,
-               guchar **p)
+               guchar  *p)
 {
   gchar namebuf[1024];
   guint16 priority, weight, port;
+  gint n;
 
-  GETSHORT (priority, *p);
-  GETSHORT (weight, *p);
-  GETSHORT (port, *p);
-  *p += dn_expand (answer, end, *p, namebuf, sizeof (namebuf));
+  if (!parse_short (&p, end, &priority) ||
+      !parse_short (&p, end, &weight) ||
+      !parse_short (&p, end, &port))
+    return NULL;
+
+  n = dn_expand (answer, end, p, namebuf, sizeof (namebuf));
+  if (n < 0)
+    return NULL;
+  *p += n;
 
   return g_variant_new ("(qqqs)",
                         priority,
@@ -1020,20 +1021,29 @@ parse_res_srv (guchar  *answer,
 static GVariant *
 parse_res_soa (guchar  *answer,
                guchar  *end,
-               guchar **p)
+               guchar  *p)
 {
   gchar mnamebuf[1024];
   gchar rnamebuf[1024];
   guint32 serial, refresh, retry, expire, ttl;
+  gint n;
 
-  *p += dn_expand (answer, end, *p, mnamebuf, sizeof (mnamebuf));
-  *p += dn_expand (answer, end, *p, rnamebuf, sizeof (rnamebuf));
+  n = dn_expand (answer, end, p, mnamebuf, sizeof (mnamebuf));
+  if (n < 0)
+    return NULL;
+  p += n;
 
-  GETLONG (serial, *p);
-  GETLONG (refresh, *p);
-  GETLONG (retry, *p);
-  GETLONG (expire, *p);
-  GETLONG (ttl, *p);
+  n = dn_expand (answer, end, p, rnamebuf, sizeof (rnamebuf));
+  if (n < 0)
+    return NULL;
+  p += n;
+
+  if (!parse_long (&p, end, &serial) ||
+      !parse_long (&p, end, &refresh) ||
+      !parse_long (&p, end, &retry) ||
+      !parse_long (&p, end, &expire) ||
+      !parse_long (&p, end, &ttl))
+    return NULL;
 
   return g_variant_new ("(ssuuuuu)",
                         mnamebuf,
@@ -1048,11 +1058,14 @@ parse_res_soa (guchar  *answer,
 static GVariant *
 parse_res_ns (guchar  *answer,
               guchar  *end,
-              guchar **p)
+              guchar  *p)
 {
   gchar namebuf[1024];
+  gint n;
 
-  *p += dn_expand (answer, end, *p, namebuf, sizeof (namebuf));
+  n = dn_expand (answer, end, p, namebuf, sizeof (namebuf));
+  if (n < 0)
+    return NULL;
 
   return g_variant_new ("(s)", namebuf);
 }
@@ -1060,14 +1073,19 @@ parse_res_ns (guchar  *answer,
 static GVariant *
 parse_res_mx (guchar  *answer,
               guchar  *end,
-              guchar **p)
+              guchar  *p)
 {
   gchar namebuf[1024];
   guint16 preference;
+  gint n;
 
-  GETSHORT (preference, *p);
+  if (!parse_short (&p, end, &preference))
+    return NULL;
 
-  *p += dn_expand (answer, end, *p, namebuf, sizeof (namebuf));
+  n = dn_expand (answer, end, p, namebuf, sizeof (namebuf));
+  if (n < 0)
+    return NULL;
+  p += n;
 
   return g_variant_new ("(qs)",
                         preference,
@@ -1077,24 +1095,22 @@ parse_res_mx (guchar  *answer,
 static GVariant *
 parse_res_txt (guchar  *answer,
                guchar  *end,
-               guchar **p)
+               guchar  *p)
 {
   GVariant *record;
   GPtrArray *array;
-  guchar *at = *p;
   gsize len;
 
   array = g_ptr_array_new_with_free_func (g_free);
-  while (at < end)
+  while (p < end)
     {
-      len = *(at++);
-      if (len > at - end)
+      len = *(p++);
+      if (len > p - end)
         break;
-      g_ptr_array_add (array, g_strndup ((gchar *)at, len));
-      at += len;
+      g_ptr_array_add (array, g_strndup ((gchar *)p, len));
+      p += len;
     }
 
-  *p = at;
   record = g_variant_new ("(@as)",
                           g_variant_new_strv ((const gchar **)array->pdata, array->len));
   g_ptr_array_free (array, TRUE);
@@ -1130,13 +1146,13 @@ _g_resolver_records_from_res_query (const gchar      *rrname,
                                     GError          **error)
 {
   gint count;
-  gchar namebuf[1024];
   guchar *end, *p;
   guint16 type, qclass, rdlength;
   guint32 ttl;
   HEADER *header;
   GList *records;
   GVariant *record;
+  gint n, i;
 
   if (len <= 0)
     {
@@ -1171,60 +1187,85 @@ _g_resolver_records_from_res_query (const gchar      *rrname,
 
   /* Skip query */
   count = ntohs (header->qdcount);
-  while (count-- && p < end)
+  for (i = 0; i < count && p < end; i++)
     {
-      p += dn_expand (answer, end, p, namebuf, sizeof (namebuf));
+      n = dn_skipname (p, end);
+      if (n < 0)
+        break;
+      p += n;
       p += 4;
+    }
 
-      /* To silence gcc warnings */
-      namebuf[0] = namebuf[1];
+  /* Incomplete response */
+  if (i < count)
+    {
+      g_set_error (error, G_RESOLVER_ERROR, G_RESOLVER_ERROR_TEMPORARY_FAILURE,
+                   _("Incomplete data received for '%s'"), rrname);
+      return NULL;
     }
 
   /* Read answers */
   count = ntohs (header->ancount);
-  while (count-- && p < end)
+  for (i = 0; i < count && p < end; i++)
     {
-      p += dn_expand (answer, end, p, namebuf, sizeof (namebuf));
-      GETSHORT (type, p);
-      GETSHORT (qclass, p);
-      GETLONG  (ttl, p);
+      n = dn_skipname (p, end);
+      if (n < 0)
+        break;
+      p += n;
+
+      if (!parse_short (&p, end, &type) ||
+          !parse_short (&p, end, &qclass) ||
+          !parse_long (&p, end, &ttl) ||
+          !parse_short (&p, end, &rdlength))
+        break;
+
       ttl = ttl; /* To avoid -Wunused-but-set-variable */
-      GETSHORT (rdlength, p);
 
-      if (type != rrtype || qclass != C_IN)
+      if (p + rdlength > end)
+        break;
+
+      if (type == rrtype && qclass == C_IN)
         {
-          p += rdlength;
-          continue;
+          switch (rrtype)
+            {
+            case T_SRV:
+              record = parse_res_srv (answer, end, p);
+              break;
+            case T_MX:
+              record = parse_res_mx (answer, end, p);
+              break;
+            case T_SOA:
+              record = parse_res_soa (answer, end, p);
+              break;
+            case T_NS:
+              record = parse_res_ns (answer, end, p);
+              break;
+            case T_TXT:
+              record = parse_res_txt (answer, p + rdlength, p);
+              break;
+            default:
+              g_warn_if_reached ();
+              record = NULL;
+              break;
+            }
+
+          if (record != NULL)
+            records = g_list_prepend (records, record);
         }
 
-      switch (rrtype)
-        {
-        case T_SRV:
-          record = parse_res_srv (answer, end, &p);
-          break;
-        case T_MX:
-          record = parse_res_mx (answer, end, &p);
-          break;
-        case T_SOA:
-          record = parse_res_soa (answer, end, &p);
-          break;
-        case T_NS:
-          record = parse_res_ns (answer, end, &p);
-          break;
-        case T_TXT:
-          record = parse_res_txt (answer, p + rdlength, &p);
-          break;
-        default:
-          g_warn_if_reached ();
-          record = NULL;
-          break;
-        }
-
-      if (record != NULL)
-        records = g_list_prepend (records, record);
+      p += rdlength;
     }
 
-    return records;
+  /* Somehow got a truncated response */
+  if (i < count)
+    {
+      g_list_free_full (records, (GDestroyNotify)g_variant_unref);
+      g_set_error (error, G_RESOLVER_ERROR, G_RESOLVER_ERROR_TEMPORARY_FAILURE,
+                   _("Incomplete data received for '%s'"), rrname);
+      return NULL;
+    }
+
+  return records;
 }
 
 #elif defined(G_OS_WIN32)

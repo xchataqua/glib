@@ -255,7 +255,7 @@ g_menu_new (void)
  * @detailed_action: (allow-none): the detailed action string, or %NULL
  *
  * Convenience function for inserting a normal menu item into @menu.
- * Combine g_menu_new() and g_menu_insert_item() for a more flexible
+ * Combine g_menu_item_new() and g_menu_insert_item() for a more flexible
  * alternative.
  *
  * Since: 2.32
@@ -280,7 +280,7 @@ g_menu_insert (GMenu       *menu,
  * @detailed_action: (allow-none): the detailed action string, or %NULL
  *
  * Convenience function for prepending a normal menu item to the start
- * of @menu.  Combine g_menu_new() and g_menu_insert_item() for a more
+ * of @menu.  Combine g_menu_item_new() and g_menu_insert_item() for a more
  * flexible alternative.
  *
  * Since: 2.32
@@ -300,7 +300,7 @@ g_menu_prepend (GMenu       *menu,
  * @detailed_action: (allow-none): the detailed action string, or %NULL
  *
  * Convenience function for appending a normal menu item to the end of
- * @menu.  Combine g_menu_new() and g_menu_insert_item() for a more
+ * @menu.  Combine g_menu_item_new() and g_menu_insert_item() for a more
  * flexible alternative.
  *
  * Since: 2.32
@@ -451,7 +451,7 @@ g_menu_clear_item (struct item *item)
 {
   if (item->attributes != NULL)
     g_hash_table_unref (item->attributes);
-  if (item->links != NULL);
+  if (item->links != NULL)
     g_hash_table_unref (item->links);
 }
 
@@ -742,6 +742,124 @@ g_menu_item_set_link (GMenuItem   *menu_item,
     g_hash_table_insert (menu_item->links, g_strdup (link), g_object_ref (model));
   else
     g_hash_table_remove (menu_item->links, link);
+}
+
+/**
+ * g_menu_item_get_attribute_value:
+ * @menu_item: a #GMenuItem
+ * @attribute: the attribute name to query
+ * @expected_type: (allow-none): the expected type of the attribute
+ *
+ * Queries the named @attribute on @menu_item.
+ *
+ * If @expected_type is specified and the attribute does not have this
+ * type, %NULL is returned.  %NULL is also returned if the attribute
+ * simply does not exist.
+ *
+ * Returns: (transfer full): the attribute value, or %NULL
+ *
+ * Since: 2.34
+ */
+GVariant *
+g_menu_item_get_attribute_value (GMenuItem          *menu_item,
+                                 const gchar        *attribute,
+                                 const GVariantType *expected_type)
+{
+  GVariant *value;
+
+  g_return_val_if_fail (G_IS_MENU_ITEM (menu_item), NULL);
+  g_return_val_if_fail (attribute != NULL, NULL);
+
+  value = g_hash_table_lookup (menu_item->attributes, attribute);
+
+  if (value != NULL)
+    {
+      if (expected_type == NULL || g_variant_is_of_type (value, expected_type))
+        g_variant_ref (value);
+      else
+        value = NULL;
+    }
+
+  return value;
+}
+
+/**
+ * g_menu_item_get_attribute:
+ * @menu_item: a #GMenuItem
+ * @attribute: the attribute name to query
+ * @format_string: a #GVariant format string
+ * @...: positional parameters, as per @format_string
+ *
+ * Queries the named @attribute on @menu_item.
+ *
+ * If the attribute exists and matches the #GVariantType corresponding
+ * to @format_string then @format_string is used to deconstruct the
+ * value into the positional parameters and %TRUE is returned.
+ *
+ * If the attribute does not exist, or it does exist but has the wrong
+ * type, then the positional parameters are ignored and %FALSE is
+ * returned.
+ *
+ * Returns: %TRUE if the named attribute was found with the expected
+ *     type
+ *
+ * Since: 2.34
+ */
+gboolean
+g_menu_item_get_attribute (GMenuItem   *menu_item,
+                           const gchar *attribute,
+                           const gchar *format_string,
+                           ...)
+{
+  GVariant *value;
+  va_list ap;
+
+  g_return_val_if_fail (G_IS_MENU_ITEM (menu_item), FALSE);
+  g_return_val_if_fail (attribute != NULL, FALSE);
+  g_return_val_if_fail (format_string != NULL, FALSE);
+
+  value = g_hash_table_lookup (menu_item->attributes, attribute);
+
+  if (value == NULL)
+    return FALSE;
+
+  if (!g_variant_check_format_string (value, format_string, FALSE))
+    return FALSE;
+
+  va_start (ap, format_string);
+  g_variant_get_va (value, format_string, NULL, &ap);
+  va_end (ap);
+
+  return TRUE;
+}
+
+/**
+ * g_menu_item_get_link:
+ * @menu_item: a #GMenuItem
+ * @link: the link name to query
+ *
+ * Queries the named @link on @menu_item.
+ *
+ * Returns: (transfer full): the link, or %NULL
+ *
+ * Since: 2.34
+ */
+GMenuModel *
+g_menu_item_get_link (GMenuItem   *menu_item,
+                      const gchar *link)
+{
+  GMenuModel *model;
+
+  g_return_val_if_fail (G_IS_MENU_ITEM (menu_item), NULL);
+  g_return_val_if_fail (link != NULL, NULL);
+  g_return_val_if_fail (valid_attribute_name (link), NULL);
+
+  model = g_hash_table_lookup (menu_item->links, link);
+
+  if (model)
+    g_object_ref (model);
+
+  return model;
 }
 
 /**
@@ -1126,6 +1244,93 @@ g_menu_item_new_section (const gchar *label,
     g_menu_item_set_label (menu_item, label);
 
   g_menu_item_set_section (menu_item, section);
+
+  return menu_item;
+}
+
+/**
+ * g_menu_item_new_from_model:
+ * @model: a #GMenuModel
+ * @item_index: the index of an item in @model
+ *
+ * Creates a #GMenuItem as an exact copy of an existing menu item in a
+ * #GMenuModel.
+ *
+ * @item_index must be valid (ie: be sure to call
+ * g_menu_model_get_n_items() first).
+ *
+ * Returns: a new #GMenuItem.
+ *
+ * Since: 2.34
+ */
+GMenuItem *
+g_menu_item_new_from_model (GMenuModel *model,
+                            gint        item_index)
+{
+  GMenuModelClass *class = G_MENU_MODEL_GET_CLASS (model);
+  GMenuItem *menu_item;
+
+  menu_item = g_object_new (G_TYPE_MENU_ITEM, NULL);
+
+  /* With some trickery we can be pretty efficient.
+   *
+   * A GMenuModel must either implement iterate_item_attributes() or
+   * get_item_attributes().  If it implements get_item_attributes() then
+   * we are in luck -- we can just take a reference on the returned
+   * hashtable and mark ourselves as copy-on-write.
+   *
+   * In the case that the model is based on get_item_attributes (which
+   * is the case for both GMenu and GDBusMenuModel) then this is
+   * basically just g_hash_table_ref().
+   */
+  if (class->get_item_attributes)
+    {
+      GHashTable *attributes = NULL;
+
+      class->get_item_attributes (model, item_index, &attributes);
+      if (attributes)
+        {
+          g_hash_table_unref (menu_item->attributes);
+          menu_item->attributes = attributes;
+          menu_item->cow = TRUE;
+        }
+    }
+  else
+    {
+      GMenuAttributeIter *iter;
+      const gchar *attribute;
+      GVariant *value;
+
+      iter = g_menu_model_iterate_item_attributes (model, item_index);
+      while (g_menu_attribute_iter_get_next (iter, &attribute, &value))
+        g_hash_table_insert (menu_item->attributes, g_strdup (attribute), value);
+      g_object_unref (iter);
+    }
+
+  /* Same story for the links... */
+  if (class->get_item_links)
+    {
+      GHashTable *links = NULL;
+
+      class->get_item_links (model, item_index, &links);
+      if (links)
+        {
+          g_hash_table_unref (menu_item->links);
+          menu_item->links = links;
+          menu_item->cow = TRUE;
+        }
+    }
+  else
+    {
+      GMenuLinkIter *iter;
+      const gchar *link;
+      GMenuModel *value;
+
+      iter = g_menu_model_iterate_item_links (model, item_index);
+      while (g_menu_link_iter_get_next (iter, &link, &value))
+        g_hash_table_insert (menu_item->links, g_strdup (link), value);
+      g_object_unref (iter);
+    }
 
   return menu_item;
 }

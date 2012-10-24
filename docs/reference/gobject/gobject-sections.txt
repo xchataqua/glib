@@ -98,6 +98,7 @@ g_type_add_interface_check
 g_type_remove_interface_check
 GTypeInterfaceCheckFunc
 g_type_value_table_peek
+g_type_ensure
 
 G_DEFINE_TYPE
 G_DEFINE_TYPE_WITH_CODE
@@ -273,10 +274,14 @@ g_object_get_data
 g_object_set_data
 g_object_set_data_full
 g_object_steal_data
+g_object_dup_data
+g_object_replace_data
 g_object_get_qdata
 g_object_set_qdata
 g_object_set_qdata_full
 g_object_steal_qdata
+g_object_dup_qdata
+g_object_replace_qdata
 g_object_set_property
 g_object_get_property
 g_object_new_valist
@@ -360,6 +365,7 @@ G_TYPE_BYTES
 G_TYPE_VARIANT_TYPE
 G_TYPE_ERROR
 G_TYPE_DATE_TIME
+G_TYPE_TIME_ZONE
 G_TYPE_IO_CHANNEL
 G_TYPE_IO_CONDITION
 G_TYPE_VARIANT_BUILDER
@@ -384,6 +390,7 @@ g_byte_array_get_type
 g_ptr_array_get_type
 g_error_get_type
 g_date_time_get_type
+g_time_zone_get_type
 g_variant_get_gtype
 g_variant_type_get_gtype
 g_variant_builder_get_type
@@ -748,6 +755,7 @@ g_param_spec_types
 GTypeCValue
 G_VALUE_COLLECT_INIT
 G_VALUE_COLLECT
+G_VALUE_COLLECT_SKIP
 G_VALUE_LCOPY
 G_VALUE_COLLECT_FORMAT_MAX_LENGTH
 </SECTION>
@@ -758,6 +766,7 @@ G_VALUE_COLLECT_FORMAT_MAX_LENGTH
 GSignalInvocationHint
 GSignalAccumulator
 GSignalCMarshaller
+GSignalCVaMarshaller
 GSignalEmissionHook
 GSignalFlags
 GSignalMatchType
@@ -768,6 +777,7 @@ G_SIGNAL_FLAGS_MASK
 g_signal_new
 g_signal_newv
 g_signal_new_valist
+g_signal_set_va_marshaller
 g_signal_query
 g_signal_lookup
 g_signal_name
@@ -827,6 +837,7 @@ GClosure
 G_TYPE_CLOSURE
 GCClosure
 GClosureMarshal
+GVaClosureMarshal
 GClosureNotify
 g_cclosure_new
 g_cclosure_new_swap
@@ -875,6 +886,31 @@ g_cclosure_marshal_BOOLEAN__FLAGS
 g_cclosure_marshal_BOOL__FLAGS
 g_cclosure_marshal_BOOLEAN__BOXED_BOXED
 g_cclosure_marshal_BOOL__BOXED_BOXED
+
+<SUBSECTION>
+g_cclosure_marshal_generic_va
+g_cclosure_marshal_VOID__VOIDv
+g_cclosure_marshal_VOID__BOOLEANv
+g_cclosure_marshal_VOID__CHARv
+g_cclosure_marshal_VOID__UCHARv
+g_cclosure_marshal_VOID__INTv
+g_cclosure_marshal_VOID__UINTv
+g_cclosure_marshal_VOID__LONGv
+g_cclosure_marshal_VOID__ULONGv
+g_cclosure_marshal_VOID__ENUMv
+g_cclosure_marshal_VOID__FLAGSv
+g_cclosure_marshal_VOID__FLOATv
+g_cclosure_marshal_VOID__DOUBLEv
+g_cclosure_marshal_VOID__STRINGv
+g_cclosure_marshal_VOID__PARAMv
+g_cclosure_marshal_VOID__BOXEDv
+g_cclosure_marshal_VOID__POINTERv
+g_cclosure_marshal_VOID__OBJECTv
+g_cclosure_marshal_VOID__VARIANTv
+g_cclosure_marshal_STRING__OBJECT_POINTERv
+g_cclosure_marshal_VOID__UINT_POINTERv
+g_cclosure_marshal_BOOLEAN__FLAGSv
+g_cclosure_marshal_BOOLEAN__BOXED_BOXEDv
 
 <SUBSECTION Private>
 GClosureNotifyData

@@ -1,5 +1,8 @@
 include $(top_srcdir)/Makefile.decl
 
+AM_CPPFLAGS = 					\
+	-DG_LOG_DOMAIN=\"GLib-GObject\"
+
 INCLUDES = -g $(gobject_INCLUDES) $(GLIB_DEBUG_FLAGS)
 
 if CROSS_COMPILING
@@ -12,6 +15,7 @@ noinst_PROGRAMS  = $(TEST_PROGS)
 LDADD = ../libgobject-2.0.la $(top_builddir)/gthread/libgthread-2.0.la $(top_builddir)/glib/libglib-2.0.la
 
 TEST_PROGS += 		\
+	qdata		\
 	boxed		\
 	enums		\
 	param		\

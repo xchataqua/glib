@@ -97,14 +97,14 @@ static const SchemaTest tests[] = {
   { "range-parse-error",            NULL, "*invalid character in number*"                       },
   { "from-docs",                    NULL, NULL                                                  },
   { "extending",                    NULL, NULL                                                  },
-  { "extend-missing",               NULL, "*extends not yet existing schema*"                   },
+  { "extend-missing",               NULL, "*extends not-yet-existing schema*"                   },
   { "extend-nonlist",               NULL, "*which is not a list*"                               },
-  { "extend-self",                  NULL, "*not yet existing*"                                  },
+  { "extend-self",                  NULL, "*not-yet-existing*"                                  },
   { "extend-wrong-list-indirect",   NULL, "*'y' does not extend 'x'*"                           },
   { "extend-wrong-list",            NULL, "*'y' does not extend 'x'*"                           },
   { "key-in-list-indirect",         NULL, "*cannot add keys to a 'list*"                        },
   { "key-in-list",                  NULL, "*cannot add keys to a 'list*"                        },
-  { "list-of-missing",              NULL, "*is list of not yet existing schema*"                },
+  { "list-of-missing",              NULL, "*is list of not-yet-existing schema*"                },
   { "extend-and-shadow",            NULL, "*shadows*use <override>*"                            },
   { "extend-and-shadow-indirect",   NULL, "*shadows*use <override>*"                            },
   { "override",                     NULL, NULL                                                  },
@@ -131,7 +131,6 @@ main (int argc, char *argv[])
 
   setlocale (LC_ALL, "");
 
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
 
   for (i = 0; i < G_N_ELEMENTS (tests); ++i)

@@ -194,11 +194,7 @@
  */
 #define NUL_TERMINATOR_LENGTH 4
 
-GQuark 
-g_convert_error_quark (void)
-{
-  return g_quark_from_static_string ("g_convert_error");
-}
+G_DEFINE_QUARK (g_convert_error, g_convert_error)
 
 static gboolean
 try_conversion (const char *to_codeset,
@@ -2079,9 +2075,9 @@ g_filename_to_uri (const gchar *filename,
  * mime type defined in RFC 2483 into individual URIs,
  * discarding any comments. The URIs are not validated.
  *
- * Returns: a newly allocated %NULL-terminated list of
- *   strings holding the individual URIs. The array should
- *   be freed with g_strfreev().
+ * Returns: (transfer full): a newly allocated %NULL-terminated list
+ *   of strings holding the individual URIs. The array should be freed
+ *   with g_strfreev().
  *
  * Since: 2.6
  */

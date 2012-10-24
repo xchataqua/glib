@@ -24,6 +24,7 @@
 #include "config.h"
 #include "gdrive.h"
 #include "gsimpleasyncresult.h"
+#include "gthemedicon.h"
 #include "gasyncresult.h"
 #include "gioerror.h"
 #include "glibintl.h"
@@ -172,6 +173,35 @@ g_drive_get_icon (GDrive *drive)
   iface = G_DRIVE_GET_IFACE (drive);
 
   return (* iface->get_icon) (drive);
+}
+
+/**
+ * g_drive_get_symbolic_icon:
+ * @drive: a #GDrive.
+ * 
+ * Gets the icon for @drive.
+ * 
+ * Returns: (transfer full): symbolic #GIcon for the @drive.
+ *    Free the returned object with g_object_unref().
+ *
+ * Since: 2.34
+ **/
+GIcon *
+g_drive_get_symbolic_icon (GDrive *drive)
+{
+  GDriveIface *iface;
+  GIcon *ret;
+
+  g_return_val_if_fail (G_IS_DRIVE (drive), NULL);
+
+  iface = G_DRIVE_GET_IFACE (drive);
+
+  if (iface->get_symbolic_icon != NULL)
+    ret = iface->get_symbolic_icon (drive);
+  else
+    ret = g_themed_icon_new_with_default_fallbacks ("drive-removable-media-symbolic");
+
+  return ret;
 }
 
 /**
@@ -391,13 +421,9 @@ g_drive_eject_finish (GDrive        *drive,
   g_return_val_if_fail (G_IS_DRIVE (drive), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
-    }
-  
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
+
   iface = G_DRIVE_GET_IFACE (drive);
   
   return (* iface->eject_finish) (drive, result, error);
@@ -475,12 +501,8 @@ g_drive_eject_with_operation_finish (GDrive        *drive,
   g_return_val_if_fail (G_IS_DRIVE (drive), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
 
   iface = G_DRIVE_GET_IFACE (drive);
   if (iface->eject_with_operation_finish != NULL)
@@ -547,13 +569,9 @@ g_drive_poll_for_media_finish (GDrive        *drive,
   g_return_val_if_fail (G_IS_DRIVE (drive), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
-    }
-  
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
+
   iface = G_DRIVE_GET_IFACE (drive);
   
   return (* iface->poll_for_media_finish) (drive, result, error);
@@ -755,12 +773,8 @@ g_drive_start_finish (GDrive         *drive,
   g_return_val_if_fail (G_IS_DRIVE (drive), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
 
   iface = G_DRIVE_GET_IFACE (drive);
 
@@ -858,12 +872,8 @@ g_drive_stop_finish (GDrive        *drive,
   g_return_val_if_fail (G_IS_DRIVE (drive), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
 
   iface = G_DRIVE_GET_IFACE (drive);
 

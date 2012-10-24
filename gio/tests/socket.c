@@ -616,8 +616,8 @@ test_timed_wait (void)
   g_clear_error (&error);
   poll_duration = g_get_monotonic_time () - start_time;
 
-  g_assert_cmpint (poll_duration, >=, 100000);
-  g_assert_cmpint (poll_duration, <, 110000);
+  g_assert_cmpint (poll_duration, >=, 98000);
+  g_assert_cmpint (poll_duration, <, 112000);
 
   g_socket_close (client, &error);
   g_assert_no_error (error);
@@ -817,7 +817,6 @@ int
 main (int   argc,
       char *argv[])
 {
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/socket/ipv4_sync", test_ipv4_sync);

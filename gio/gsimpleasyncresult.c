@@ -45,10 +45,12 @@
  * @include: gio/gio.h
  * @see_also: #GAsyncResult
  *
- * Implements #GAsyncResult for simple cases. Most of the time, this
- * will be all an application needs, and will be used transparently.
- * Because of this, #GSimpleAsyncResult is used throughout GIO for
- * handling asynchronous functions.
+ * <note><para>
+ *   As of GLib 2.36, #GSimpleAsyncResult is deprecated in favor of
+ *   #GTask, which provides a simpler API.
+ * </para></note>
+ *
+ * #GSimpleAsyncResult implements #GAsyncResult.
  *
  * GSimpleAsyncResult handles #GAsyncReadyCallback<!-- -->s, error
  * reporting, operation cancellation and the final state of an operation,
@@ -457,11 +459,19 @@ g_simple_async_result_get_source_object (GAsyncResult *res)
   return NULL;
 }
 
+static gboolean
+g_simple_async_result_is_tagged (GAsyncResult *res,
+				 gpointer      source_tag)
+{
+  return G_SIMPLE_ASYNC_RESULT (res)->source_tag == source_tag;
+}
+
 static void
 g_simple_async_result_async_result_iface_init (GAsyncResultIface *iface)
 {
   iface->get_user_data = g_simple_async_result_get_user_data;
   iface->get_source_object = g_simple_async_result_get_source_object;
+  iface->is_tagged = g_simple_async_result_is_tagged;
 }
 
 /**
@@ -903,7 +913,9 @@ g_simple_async_result_run_in_thread (GSimpleAsyncResult     *simple,
   data->cancellable = cancellable;
   if (cancellable)
     g_object_ref (cancellable);
+  G_GNUC_BEGIN_IGNORE_DEPRECATIONS;
   g_io_scheduler_push_job (run_in_thread, data, NULL, io_priority, cancellable);
+  G_GNUC_END_IGNORE_DEPRECATIONS;
 }
 
 /**

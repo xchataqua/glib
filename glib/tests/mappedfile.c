@@ -6,6 +6,7 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#include <glib/gstdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -120,7 +121,7 @@ test_writable_fd (void)
     }
 
   error = NULL;
-  fd = open (SRCDIR "/4096-random-bytes", O_RDWR, 0);
+  fd = g_open (SRCDIR "/4096-random-bytes", O_RDWR, 0);
   g_assert (fd != -1);
   file = g_mapped_file_new_from_fd (fd, TRUE, &error);
   g_assert_no_error (error);
@@ -135,7 +136,7 @@ test_writable_fd (void)
   close (fd);
 
   error = NULL;
-  fd = open (SRCDIR "/4096-random-bytes", O_RDWR, 0);
+  fd = g_open (SRCDIR "/4096-random-bytes", O_RDWR, 0);
   g_assert (fd != -1);
   file = g_mapped_file_new_from_fd (fd, TRUE, &error);
   g_assert_no_error (error);
@@ -145,6 +146,24 @@ test_writable_fd (void)
 
   g_mapped_file_free (file);
 
+}
+
+static void
+test_gbytes (void)
+{
+  GMappedFile *file;
+  GBytes *bytes;
+  GError *error;
+
+  error = NULL;
+  file = g_mapped_file_new (SRCDIR "/empty", FALSE, &error);
+  g_assert_no_error (error);
+
+  bytes = g_mapped_file_get_bytes (file);
+  g_mapped_file_unref (file);
+
+  g_assert_cmpint (g_bytes_get_size (bytes), ==, 0);
+  g_bytes_unref (bytes);
 }
 
 int
@@ -158,6 +177,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/mappedfile/nonexisting", test_nonexisting);
   g_test_add_func ("/mappedfile/writable", test_writable);
   g_test_add_func ("/mappedfile/writable_fd", test_writable_fd);
+  g_test_add_func ("/mappedfile/gbytes", test_gbytes);
 
   return g_test_run ();
 }

@@ -28,6 +28,7 @@
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <glib/gstdio.h>
 #endif
 #include <string.h>
 #include <stdlib.h>
@@ -784,26 +785,25 @@ parse_args (gint    *argc_p,
             }
           argv[i] = NULL;
         }
-      else if (strcmp ("-?", argv[i]) == 0 || strcmp ("--help", argv[i]) == 0)
+      else if (strcmp ("-?", argv[i]) == 0 ||
+               strcmp ("-h", argv[i]) == 0 ||
+               strcmp ("--help", argv[i]) == 0)
         {
           printf ("Usage:\n"
                   "  %s [OPTION...]\n\n"
                   "Help Options:\n"
-                  "  -?, --help                     Show help options\n"
+                  "  -h, --help                     Show help options\n\n"
                   "Test Options:\n"
+                  "  --g-fatal-warnings             Make all warnings fatal\n"
                   "  -l                             List test cases available in a test executable\n"
-                  "  -seed=RANDOMSEED               Provide a random seed to reproduce test\n"
-                  "                                 runs using random numbers\n"
-                  "  --verbose                      Run tests verbosely\n"
-                  "  -q, --quiet                    Run tests quietly\n"
-                  "  -p TESTPATH                    execute all tests matching TESTPATH\n"
-                  "  -s TESTPATH                    skip all tests matching TESTPATH\n"
-                  "  -m {perf|slow|thorough|quick}  Execute tests according modes\n"
-                  "  -m {undefined|no-undefined}    Execute tests according modes\n"
+                  "  -m {perf|slow|thorough|quick}  Execute tests according to mode\n"
+                  "  -m {undefined|no-undefined}    Execute tests according to mode\n"
+                  "  -p TESTPATH                    Only start test cases matching TESTPATH\n"
+                  "  -s TESTPATH                    Skip all tests matching TESTPATH\n"
+                  "  -seed=SEEDSTRING               Start tests with random seed SEEDSTRING\n"
                   "  --debug-log                    debug test logging output\n"
-                  "  -k, --keep-going               gtester-specific argument\n"
-                  "  --GTestLogFD=N                 gtester-specific argument\n"
-                  "  --GTestSkipCount=N             gtester-specific argument\n",
+                  "  -q, --quiet                    Run tests quietly\n"
+                  "  --verbose                      Run tests verbosely\n",
                   argv[0]);
           exit (0);
         }
@@ -836,57 +836,57 @@ parse_args (gint    *argc_p,
  *   <varlistentry>
  *     <term><option>-l</option></term>
  *     <listitem><para>
- *       list test cases available in a test executable.
+ *       List test cases available in a test executable.
  *     </para></listitem>
  *   </varlistentry>
  *   <varlistentry>
  *     <term><option>--seed=<replaceable>RANDOMSEED</replaceable></option></term>
  *     <listitem><para>
- *       provide a random seed to reproduce test runs using random numbers.
+ *       Provide a random seed to reproduce test runs using random numbers.
  *     </para></listitem>
  *     </varlistentry>
  *     <varlistentry>
  *       <term><option>--verbose</option></term>
- *       <listitem><para>run tests verbosely.</para></listitem>
+ *       <listitem><para>Run tests verbosely.</para></listitem>
  *     </varlistentry>
  *     <varlistentry>
  *       <term><option>-q</option>, <option>--quiet</option></term>
- *       <listitem><para>run tests quietly.</para></listitem>
+ *       <listitem><para>Run tests quietly.</para></listitem>
  *     </varlistentry>
  *     <varlistentry>
  *       <term><option>-p <replaceable>TESTPATH</replaceable></option></term>
  *       <listitem><para>
- *         execute all tests matching <replaceable>TESTPATH</replaceable>.
+ *         Execute all tests matching <replaceable>TESTPATH</replaceable>.
  *       </para></listitem>
  *     </varlistentry>
  *     <varlistentry>
  *       <term><option>-m {perf|slow|thorough|quick|undefined|no-undefined}</option></term>
  *       <listitem><para>
- *         execute tests according to these test modes:
+ *         Execute tests according to these test modes:
  *         <variablelist>
  *           <varlistentry>
  *             <term>perf</term>
  *             <listitem><para>
- *               performance tests, may take long and report results.
+ *               Performance tests, may take long and report results.
  *             </para></listitem>
  *           </varlistentry>
  *           <varlistentry>
  *             <term>slow, thorough</term>
  *             <listitem><para>
- *               slow and thorough tests, may take quite long and 
+ *               Slow and thorough tests, may take quite long and
  *               maximize coverage.
  *             </para></listitem>
  *           </varlistentry>
  *           <varlistentry>
  *             <term>quick</term>
  *             <listitem><para>
- *               quick tests, should run really quickly and give good coverage.
+ *               Quick tests, should run really quickly and give good coverage.
  *             </para></listitem>
  *           </varlistentry>
  *           <varlistentry>
  *             <term>undefined</term>
  *             <listitem><para>
- *               tests for undefined behaviour, may provoke programming errors
+ *               Tests for undefined behaviour, may provoke programming errors
  *               under g_test_trap_fork() to check that appropriate assertions
  *               or warnings are given
  *             </para></listitem>
@@ -894,7 +894,7 @@ parse_args (gint    *argc_p,
  *           <varlistentry>
  *             <term>no-undefined</term>
  *             <listitem><para>
- *               avoid tests for undefined behaviour
+ *               Avoid tests for undefined behaviour
  *             </para></listitem>
  *           </varlistentry>
  *         </variablelist>
@@ -902,19 +902,7 @@ parse_args (gint    *argc_p,
  *     </varlistentry>
  *     <varlistentry>
  *       <term><option>--debug-log</option></term>
- *       <listitem><para>debug test logging output.</para></listitem>
- *     </varlistentry>
- *     <varlistentry>
- *       <term><option>-k</option>, <option>--keep-going</option></term>
- *       <listitem><para>gtester-specific argument.</para></listitem>
- *     </varlistentry>
- *     <varlistentry>
- *       <term><option>--GTestLogFD <replaceable>N</replaceable></option></term>
- *       <listitem><para>gtester-specific argument.</para></listitem>
- *     </varlistentry>
- *     <varlistentry>
- *       <term><option>--GTestSkipCount <replaceable>N</replaceable></option></term>
- *       <listitem><para>gtester-specific argument.</para></listitem>
+ *       <listitem><para>Debug test logging output.</para></listitem>
  *     </varlistentry>
  *  </variablelist>
  *
@@ -1523,7 +1511,35 @@ g_test_add_data_func (const char     *testpath,
   g_return_if_fail (testpath != NULL);
   g_return_if_fail (testpath[0] == '/');
   g_return_if_fail (test_func != NULL);
+
   g_test_add_vtable (testpath, 0, test_data, NULL, (GTestFixtureFunc) test_func, NULL);
+}
+
+/**
+ * g_test_add_data_func_full:
+ * @testpath: /-separated test case path name for the test.
+ * @test_data: Test data argument for the test function.
+ * @test_func: The test function to invoke for this test.
+ * @data_free_func: #GDestroyNotify for @test_data.
+ *
+ * Create a new test case, as with g_test_add_data_func(), but freeing
+ * @test_data after the test run is complete.
+ *
+ * Since: 2.34
+ */
+void
+g_test_add_data_func_full (const char     *testpath,
+                           gpointer        test_data,
+                           GTestDataFunc   test_func,
+                           GDestroyNotify  data_free_func)
+{
+  g_return_if_fail (testpath != NULL);
+  g_return_if_fail (testpath[0] == '/');
+  g_return_if_fail (test_func != NULL);
+
+  g_test_add_vtable (testpath, 0, test_data, NULL,
+                     (GTestFixtureFunc) test_func,
+                     (GTestFixtureFunc) data_free_func);
 }
 
 /**
@@ -1957,11 +1973,11 @@ g_assertion_message_error (const char     *domain,
  * @str1: (allow-none): a C string or %NULL
  * @str2: (allow-none): another C string or %NULL
  *
- * Compares @str1 and @str2 like strcmp(). Handles %NULL 
+ * Compares @str1 and @str2 like strcmp(). Handles %NULL
  * gracefully by sorting it before non-%NULL strings.
  * Comparing two %NULL pointers returns 0.
  *
- * Returns: -1, 0 or 1, if @str1 is <, == or > than @str2.
+ * Returns: an integer less than, equal to, or greater than zero, if @str1 is <, == or > than @str2.
  *
  * Since: 2.16
  */
@@ -2162,7 +2178,7 @@ g_test_trap_fork (guint64        usec_timeout,
       close (stderr_pipe[0]);
       close (stdtst_pipe[0]);
       if (!(test_trap_flags & G_TEST_TRAP_INHERIT_STDIN))
-        fd0 = open ("/dev/null", O_RDONLY);
+        fd0 = g_open ("/dev/null", O_RDONLY, 0);
       if (sane_dup2 (stdout_pipe[1], 1) < 0 || sane_dup2 (stderr_pipe[1], 2) < 0 || (fd0 >= 0 && sane_dup2 (fd0, 0) < 0))
         g_error ("failed to dup2() in forked test program: %s", g_strerror (errno));
       if (fd0 >= 3)

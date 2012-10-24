@@ -29,6 +29,7 @@
 
 #include "gmount.h"
 #include "gmountprivate.h"
+#include "gthemedicon.h"
 #include "gasyncresult.h"
 #include "gsimpleasyncresult.h"
 #include "gioerror.h"
@@ -213,6 +214,37 @@ g_mount_get_icon (GMount *mount)
   return (* iface->get_icon) (mount);
 }
 
+
+/**
+ * g_mount_get_symbolic_icon:
+ * @mount: a #GMount.
+ * 
+ * Gets the symbolic icon for @mount.
+ * 
+ * Returns: (transfer full): a #GIcon.
+ *      The returned object should be unreffed with 
+ *      g_object_unref() when no longer needed.
+ *
+ * Since: 2.34
+ **/
+GIcon *
+g_mount_get_symbolic_icon (GMount *mount)
+{
+  GMountIface *iface;
+  GIcon *ret;
+
+  g_return_val_if_fail (G_IS_MOUNT (mount), NULL);
+
+  iface = G_MOUNT_GET_IFACE (mount);
+
+  if (iface->get_symbolic_icon != NULL)
+    ret = iface->get_symbolic_icon (mount);
+  else
+    ret = g_themed_icon_new_with_default_fallbacks ("folder-remote-symbolic");
+
+  return ret;
+}
+
 /**
  * g_mount_get_uuid:
  * @mount: a #GMount.
@@ -392,12 +424,8 @@ g_mount_unmount_finish (GMount        *mount,
   g_return_val_if_fail (G_IS_MOUNT (mount), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
   
   iface = G_MOUNT_GET_IFACE (mount);
   return (* iface->unmount_finish) (mount, result, error);
@@ -471,12 +499,8 @@ g_mount_eject_finish (GMount        *mount,
   g_return_val_if_fail (G_IS_MOUNT (mount), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
   
   iface = G_MOUNT_GET_IFACE (mount);
   return (* iface->eject_finish) (mount, result, error);
@@ -555,12 +579,8 @@ g_mount_unmount_with_operation_finish (GMount        *mount,
   g_return_val_if_fail (G_IS_MOUNT (mount), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
 
   iface = G_MOUNT_GET_IFACE (mount);
   if (iface->unmount_with_operation_finish != NULL)
@@ -642,12 +662,8 @@ g_mount_eject_with_operation_finish (GMount        *mount,
   g_return_val_if_fail (G_IS_MOUNT (mount), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
 
   iface = G_MOUNT_GET_IFACE (mount);
   if (iface->eject_with_operation_finish != NULL)
@@ -728,12 +744,8 @@ g_mount_remount_finish (GMount        *mount,
   g_return_val_if_fail (G_IS_MOUNT (mount), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
   
   iface = G_MOUNT_GET_IFACE (mount);
   return (* iface->remount_finish) (mount, result, error);
@@ -818,12 +830,8 @@ g_mount_guess_content_type_finish (GMount        *mount,
   g_return_val_if_fail (G_IS_MOUNT (mount), NULL);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), NULL);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return NULL;
-    }
+  if (g_async_result_legacy_propagate_error (result, error))
+    return NULL;
   
   iface = G_MOUNT_GET_IFACE (mount);
   return (* iface->guess_content_type_finish) (mount, result, error);

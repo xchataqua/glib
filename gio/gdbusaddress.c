@@ -37,13 +37,13 @@
 #include "giostream.h"
 #include "gasyncresult.h"
 #include "gsimpleasyncresult.h"
+#include "glib-private.h"
 #include "gdbusprivate.h"
 #include "giomodule-priv.h"
 #include "gdbusdaemon.h"
 
 #ifdef G_OS_UNIX
 #include <gio/gunixsocketaddress.h>
-#include <sys/wait.h>
 #endif
 
 #ifdef G_OS_WIN32
@@ -451,7 +451,7 @@ _g_dbus_address_parse_entry (const gchar  *address_entry,
       g_set_error (error,
                    G_IO_ERROR,
                    G_IO_ERROR_INVALID_ARGUMENT,
-                   _("Address element `%s', does not contain a colon (:)"),
+                   _("Address element `%s' does not contain a colon (:)"),
                    address_entry);
       goto out;
     }
@@ -472,7 +472,7 @@ _g_dbus_address_parse_entry (const gchar  *address_entry,
           g_set_error (error,
                        G_IO_ERROR,
                        G_IO_ERROR_INVALID_ARGUMENT,
-                       _("Key/Value pair %d, `%s', in address element `%s', does not contain an equal sign"),
+                       _("Key/Value pair %d, `%s', in address element `%s' does not contain an equal sign"),
                        n,
                        kv_pair,
                        address_entry);
@@ -1023,6 +1023,14 @@ get_session_address_dbus_launch (GError **error)
   restore_dbus_verbose = FALSE;
   old_dbus_verbose = NULL;
 
+  /* Don't run binaries as root if we're setuid. */
+  if (GLIB_PRIVATE_CALL (g_check_setuid) ())
+    {
+      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+		   _("Cannot spawn a message bus when setuid"));
+      goto out;
+    }
+
   machine_id = _g_dbus_get_machine_id (error);
   if (machine_id == NULL)
     {
@@ -1063,36 +1071,12 @@ get_session_address_dbus_launch (GError **error)
                                   &exit_status,
                                   error))
     {
+      goto out;
+    }
+
+  if (!g_spawn_check_exit_status (exit_status, error))
+    {
       g_prefix_error (error, _("Error spawning command line `%s': "), command_line);
-      goto out;
-    }
-
-  if (!WIFEXITED (exit_status))
-    {
-      gchar *escaped_stderr;
-      escaped_stderr = g_strescape (launch_stderr, "");
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   _("Abnormal program termination spawning command line `%s': %s"),
-                   command_line,
-                   escaped_stderr);
-      g_free (escaped_stderr);
-      goto out;
-    }
-
-  if (WEXITSTATUS (exit_status) != 0)
-    {
-      gchar *escaped_stderr;
-      escaped_stderr = g_strescape (launch_stderr, "");
-      g_set_error (error,
-                   G_IO_ERROR,
-                   G_IO_ERROR_FAILED,
-                   _("Command line `%s' exited with non-zero exit status %d: %s"),
-                   command_line,
-                   WEXITSTATUS (exit_status),
-                   escaped_stderr);
-      g_free (escaped_stderr);
       goto out;
     }
 
@@ -1348,8 +1332,6 @@ g_win32_run_session_bus (HWND hwnd, HINSTANCE hinst, char *cmdline, int nCmdShow
 
   if (g_getenv ("GDBUS_DAEMON_DEBUG") != NULL)
     open_console_window ();
-
-  g_type_init ();
 
   loop = g_main_loop_new (NULL, FALSE);
 

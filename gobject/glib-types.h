@@ -169,6 +169,15 @@ typedef gsize GType;
 #define G_TYPE_DATE_TIME (g_date_time_get_type ())
 
 /**
+ * G_TYPE_TIME_ZONE:
+ *
+ * The #GType for a boxed type holding a #GTimeZone.
+ *
+ * Since: 2.34
+ */
+#define G_TYPE_TIME_ZONE (g_time_zone_get_type ())
+
+/**
  * G_TYPE_IO_CHANNEL:
  *
  * The #GType for #GIOChannel.
@@ -237,15 +246,20 @@ GType   g_ptr_array_get_type       (void) G_GNUC_CONST;
 GType   g_bytes_get_type           (void) G_GNUC_CONST;
 GType   g_variant_type_get_gtype   (void) G_GNUC_CONST;
 GType   g_regex_get_type           (void) G_GNUC_CONST;
+GLIB_AVAILABLE_IN_2_30
 GType   g_match_info_get_type      (void) G_GNUC_CONST;
 GType   g_error_get_type           (void) G_GNUC_CONST;
 GType   g_date_time_get_type       (void) G_GNUC_CONST;
+GType   g_time_zone_get_type       (void) G_GNUC_CONST;
 GType   g_io_channel_get_type      (void) G_GNUC_CONST;
 GType   g_io_condition_get_type    (void) G_GNUC_CONST;
 GType   g_variant_builder_get_type (void) G_GNUC_CONST;
 GType   g_key_file_get_type        (void) G_GNUC_CONST;
+GLIB_AVAILABLE_IN_2_30
 GType   g_main_loop_get_type       (void) G_GNUC_CONST;
+GLIB_AVAILABLE_IN_2_30
 GType   g_main_context_get_type    (void) G_GNUC_CONST;
+GLIB_AVAILABLE_IN_2_30
 GType   g_source_get_type          (void) G_GNUC_CONST;
 
 GLIB_DEPRECATED_FOR('G_TYPE_VARIANT')

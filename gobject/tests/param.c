@@ -482,15 +482,14 @@ test_interface_default_init (TestInterfaceInterface *iface)
               continue;
 
             /* we think that this is impossible.  make sure. */
-            if (g_test_trap_fork (G_TIME_SPAN_SECOND, G_TEST_TRAP_SILENCE_STDERR))
-              {
-                GParamSpec *pspec;
+            pspec = g_param_spec_object ("xyz", "xyz", "xyz", types[i], j);
 
-                pspec = g_param_spec_object ("xyz", "xyz", "xyz", types[i], j);
-                g_object_interface_install_property (iface, pspec);
-                exit (0);
-              }
-            g_test_trap_assert_failed ();
+            g_test_expect_message (G_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL,
+                                   "*assertion*pspec->flags*failed*");
+            g_object_interface_install_property (iface, pspec);
+            g_test_assert_expected_messages ();
+
+            g_param_spec_unref (pspec);
             continue;
           }
 
@@ -789,7 +788,6 @@ test_param_implement (void)
 int
 main (int argc, char *argv[])
 {
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/param/value", test_param_value);

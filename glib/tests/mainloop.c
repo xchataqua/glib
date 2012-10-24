@@ -77,7 +77,6 @@ test_maincontext_basic (void)
   g_assert (g_main_context_find_source_by_funcs_user_data (ctx, &funcs, NULL) == NULL);
 
   id = g_source_attach (source, ctx);
-  g_source_unref (source);
   g_assert_cmpint (g_source_get_id (source), ==, id);
   g_assert (g_main_context_find_source_by_id (ctx, id) == source);
 
@@ -85,7 +84,20 @@ test_maincontext_basic (void)
   g_assert_cmpint (g_source_get_priority (source), ==, G_PRIORITY_HIGH);
 
   g_source_destroy (source);
+  g_assert (g_source_get_context (source) == ctx);
+  g_assert (g_main_context_find_source_by_id (ctx, id) == NULL);
+
   g_main_context_unref (ctx);
+
+  if (g_test_undefined ())
+    {
+      g_test_expect_message (G_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL,
+                             "*assertion*source->context != NULL*failed*");
+      g_assert (g_source_get_context (source) == NULL);
+      g_test_assert_expected_messages ();
+    }
+
+  g_source_unref (source);
 
   ctx = g_main_context_default ();
   source = g_source_new (&funcs, sizeof (GSource));
@@ -179,7 +191,10 @@ test_timeouts (void)
 
   g_main_loop_run (loop);
 
-  g_assert_cmpint (a, ==, 10);
+  /* this is a race condition; under some circumstances we might not get 10
+   * 100ms runs in 1050 ms, so consider 9 as "close enough" */
+  g_assert_cmpint (a, >=, 9);
+  g_assert_cmpint (a, <=, 10);
   g_assert_cmpint (b, ==, 4);
   g_assert_cmpint (c, ==, 3);
 
@@ -232,6 +247,16 @@ test_priorities (void)
   g_main_context_unref (ctx);
 }
 
+static gboolean
+quit_loop (gpointer data)
+{
+  GMainLoop *loop = data;
+
+  g_main_loop_quit (loop);
+
+  return G_SOURCE_REMOVE;
+}
+
 static gint count;
 
 static gboolean
@@ -261,9 +286,11 @@ static gpointer
 thread_func (gpointer data)
 {
   GMainContext *ctx = data;
+  GMainLoop *loop;
   GSource *source;
 
   g_main_context_push_thread_default (ctx);
+  loop = g_main_loop_new (ctx, FALSE);
 
   g_mutex_lock (&mutex);
   thread_ready = TRUE;
@@ -271,12 +298,14 @@ thread_func (gpointer data)
   g_mutex_unlock (&mutex);
 
   source = g_timeout_source_new (500);
-  g_source_set_callback (source, (GSourceFunc)g_thread_exit, NULL, NULL);
+  g_source_set_callback (source, quit_loop, loop, NULL);
   g_source_attach (source, ctx);
   g_source_unref (source);
 
-  while (TRUE)
-    g_main_context_iteration (ctx, TRUE);
+  g_main_loop_run (loop);
+
+  g_main_context_pop_thread_default (ctx);
+  g_main_loop_unref (loop);
 
   return NULL;
 }
@@ -313,16 +342,8 @@ test_invoke (void)
 
   g_thread_join (thread);
   g_assert_cmpint (count, ==, 3);
-}
 
-static gboolean
-quit_loop (gpointer data)
-{
-  GMainLoop *loop = data;
-
-  g_main_loop_quit (loop);
-
-  return G_SOURCE_REMOVE;
+  g_main_context_unref (ctx);
 }
 
 static gboolean
@@ -338,6 +359,7 @@ run_inner_loop (gpointer user_data)
   timeout = g_timeout_source_new (100);
   g_source_set_callback (timeout, quit_loop, inner, NULL);
   g_source_attach (timeout, ctx);
+  g_source_unref (timeout);
 
   g_main_loop_run (inner);
   g_main_loop_unref (inner);
@@ -414,6 +436,7 @@ test_child_sources (void)
   g_assert_cmpint (b, ==, 3);
   g_assert_cmpint (c, ==, 3);
 
+  g_source_destroy (parent);
   g_source_unref (parent);
   g_source_unref (child_b);
   g_source_unref (child_c);
@@ -470,12 +493,188 @@ test_recursive_child_sources (void)
   g_assert_cmpint (b, ==, 9);
   g_assert_cmpint (c, ==, 4);
 
+  g_source_destroy (parent);
   g_source_unref (parent);
   g_source_unref (child_b);
   g_source_unref (child_c);
 
   g_main_loop_unref (loop);
   g_main_context_unref (ctx);
+}
+
+typedef struct {
+  GSource *parent, *old_child, *new_child;
+  GMainLoop *loop;
+} SwappingTestData;
+
+static gboolean
+swap_sources (gpointer user_data)
+{
+  SwappingTestData *data = user_data;
+
+  if (data->old_child)
+    {
+      g_source_remove_child_source (data->parent, data->old_child);
+      g_clear_pointer (&data->old_child, g_source_unref);
+    }
+
+  if (!data->new_child)
+    {
+      data->new_child = g_timeout_source_new (0);
+      g_source_set_callback (data->new_child, quit_loop, data->loop, NULL);
+      g_source_add_child_source (data->parent, data->new_child);
+    }
+
+  return G_SOURCE_CONTINUE;
+}
+
+static gboolean
+assert_not_reached_callback (gpointer user_data)
+{
+  g_assert_not_reached ();
+
+  return G_SOURCE_REMOVE;
+}
+
+static void
+test_swapping_child_sources (void)
+{
+  GMainContext *ctx;
+  GMainLoop *loop;
+  SwappingTestData data;
+
+  ctx = g_main_context_new ();
+  loop = g_main_loop_new (ctx, FALSE);
+
+  data.parent = g_timeout_source_new (50);
+  data.loop = loop;
+  g_source_set_callback (data.parent, swap_sources, &data, NULL);
+  g_source_attach (data.parent, ctx);
+
+  data.old_child = g_timeout_source_new (100);
+  g_source_add_child_source (data.parent, data.old_child);
+  g_source_set_callback (data.old_child, assert_not_reached_callback, NULL, NULL);
+
+  data.new_child = NULL;
+  g_main_loop_run (loop);
+
+  g_source_destroy (data.parent);
+  g_source_unref (data.parent);
+  g_source_unref (data.new_child);
+
+  g_main_loop_unref (loop);
+  g_main_context_unref (ctx);
+}
+
+typedef struct {
+  GMainContext *ctx;
+  GMainLoop *loop;
+
+  GSource *timeout1, *timeout2;
+  gint64 time1;
+} TimeTestData;
+
+static gboolean
+timeout1_callback (gpointer user_data)
+{
+  TimeTestData *data = user_data;
+  GSource *source;
+  gint64 mtime1, mtime2, time2;
+
+  source = g_main_current_source ();
+  g_assert (source == data->timeout1);
+
+  if (data->time1 == -1)
+    {
+      /* First iteration */
+      g_assert (!g_source_is_destroyed (data->timeout2));
+
+      mtime1 = g_get_monotonic_time ();
+      data->time1 = g_source_get_time (source);
+
+      /* g_source_get_time() does not change during a single callback */
+      g_usleep (1000000);
+      mtime2 = g_get_monotonic_time ();
+      time2 = g_source_get_time (source);
+
+      g_assert_cmpint (mtime1, <, mtime2);
+      g_assert_cmpint (data->time1, ==, time2);
+    }
+  else
+    {
+      /* Second iteration */
+      g_assert (g_source_is_destroyed (data->timeout2));
+
+      /* g_source_get_time() MAY change between iterations; in this
+       * case we know for sure that it did because of the g_usleep()
+       * last time.
+       */
+      time2 = g_source_get_time (source);
+      g_assert_cmpint (data->time1, <, time2);
+
+      g_main_loop_quit (data->loop);
+    }
+
+  return TRUE;
+}
+
+static gboolean
+timeout2_callback (gpointer user_data)
+{
+  TimeTestData *data = user_data;
+  GSource *source;
+  gint64 time2, time3;
+
+  source = g_main_current_source ();
+  g_assert (source == data->timeout2);
+
+  g_assert (!g_source_is_destroyed (data->timeout1));
+
+  /* g_source_get_time() does not change between different sources in
+   * a single iteration of the mainloop.
+   */
+  time2 = g_source_get_time (source);
+  g_assert_cmpint (data->time1, ==, time2);
+
+  /* The source should still have a valid time even after being
+   * destroyed, since it's currently running.
+   */
+  g_source_destroy (source);
+  time3 = g_source_get_time (source);
+  g_assert_cmpint (time2, ==, time3);
+
+  return FALSE;
+}
+
+static void
+test_source_time (void)
+{
+  TimeTestData data;
+
+  data.ctx = g_main_context_new ();
+  data.loop = g_main_loop_new (data.ctx, FALSE);
+
+  data.timeout1 = g_timeout_source_new (0);
+  g_source_set_callback (data.timeout1, timeout1_callback, &data, NULL);
+  g_source_attach (data.timeout1, data.ctx);
+
+  data.timeout2 = g_timeout_source_new (0);
+  g_source_set_callback (data.timeout2, timeout2_callback, &data, NULL);
+  g_source_attach (data.timeout2, data.ctx);
+
+  data.time1 = -1;
+
+  g_main_loop_run (data.loop);
+
+  g_assert (!g_source_is_destroyed (data.timeout1));
+  g_assert (g_source_is_destroyed (data.timeout2));
+
+  g_source_destroy (data.timeout1);
+  g_source_unref (data.timeout1);
+  g_source_unref (data.timeout2);
+
+  g_main_loop_unref (data.loop);
+  g_main_context_unref (data.ctx);
 }
 
 int
@@ -490,6 +689,8 @@ main (int argc, char *argv[])
   g_test_add_func ("/mainloop/invoke", test_invoke);
   g_test_add_func ("/mainloop/child_sources", test_child_sources);
   g_test_add_func ("/mainloop/recursive_child_sources", test_recursive_child_sources);
+  g_test_add_func ("/mainloop/swapping_child_sources", test_swapping_child_sources);
+  g_test_add_func ("/mainloop/source_time", test_source_time);
 
   return g_test_run ();
 }

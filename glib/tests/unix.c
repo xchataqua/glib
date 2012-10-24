@@ -43,6 +43,7 @@ test_pipe (void)
   memset (buf, 0, sizeof (buf));
   bytes_read = read (pipefd[0], buf, sizeof(buf) - 1);
   g_assert_cmpint (bytes_read, >, 0);
+  buf[bytes_read] = '\0';
 
   close (pipefd[0]);
   close (pipefd[1]);
@@ -95,6 +96,7 @@ static void
 test_signal (int signum)
 {
   GMainLoop *mainloop;
+  int id;
 
   mainloop = g_main_loop_new (NULL, FALSE);
 
@@ -102,10 +104,11 @@ test_signal (int signum)
   g_unix_signal_add (signum, on_sig_received, mainloop);
   kill (getpid (), signum);
   g_assert (!sig_received);
-  g_timeout_add (5000, sig_not_received, mainloop);
+  id = g_timeout_add (5000, sig_not_received, mainloop);
   g_main_loop_run (mainloop);
   g_assert (sig_received);
   sig_received = FALSE;
+  g_source_remove (id);
 
   /* Ensure we don't get double delivery */
   g_timeout_add (500, exit_mainloop, mainloop);

@@ -66,7 +66,9 @@ class CodeGenerator:
                      '#endif\n'
                      '\n'
                      '#include "%s"\n'
-                     '\n'%(self.h.name))
+                     '\n'
+                     '#include <string.h>\n'
+                     %(self.h.name))
 
         self.c.write('#ifdef G_OS_UNIX\n'
                      '#  include <gio/gunixfdlist.h>\n'
@@ -192,7 +194,12 @@ class CodeGenerator:
                      '        ret = (g_value_get_uint64 (a) == g_value_get_uint64 (b));\n'
                      '        break;\n'
                      '      case G_TYPE_DOUBLE:\n'
-                     '        ret = (g_value_get_double (a) == g_value_get_double (b));\n'
+                     '        {\n'
+                     '          /* Avoid -Wfloat-equal warnings by doing a direct bit compare */\n'
+                     '          gdouble da = g_value_get_double (a);\n'
+                     '          gdouble db = g_value_get_double (b);\n'
+                     '          ret = memcmp (&da, &db, sizeof (gdouble)) == 0;\n'
+                     '        }\n'
                      '        break;\n'
                      '      case G_TYPE_STRING:\n'
                      '        ret = (g_strcmp0 (g_value_get_string (a), g_value_get_string (b)) == 0);\n'
@@ -297,11 +304,8 @@ class CodeGenerator:
             #
             # See https://bugzilla.gnome.org/show_bug.cgi?id=647577#c5
             # for discussion
-            keys = function_pointers.keys()
-            if len(keys) > 0:
-                keys.sort(cmp=utils.my_version_cmp)
-                for key in keys:
-                    self.h.write('%s'%function_pointers[key])
+            for key in sorted(function_pointers.keys(), key=utils.version_cmp_key):
+                self.h.write('%s'%function_pointers[key])
 
             self.h.write('};\n')
             self.h.write('\n')
@@ -950,7 +954,7 @@ class CodeGenerator:
             self.c.write('GDBusInterfaceInfo *\n'
                          '%s_interface_info (void)\n'
                          '{\n'
-                         '  return (GDBusInterfaceInfo *) &_%s_interface_info;\n'
+                         '  return (GDBusInterfaceInfo *) &_%s_interface_info.parent_struct;\n'
                          '}\n'
                          '\n'%(i.name_lower, i.name_lower))
 
@@ -1015,11 +1019,9 @@ class CodeGenerator:
                 value  = '@get_%s: '%(p.name_lower)
                 value += 'Getter for the #%s:%s property.'%(i.camel_name, p.name_hyphen)
                 doc_bits[key] = value
-        keys = doc_bits.keys()
-        if len(keys) > 0:
-            keys.sort(cmp=utils.my_version_cmp)
-            for key in keys:
-                self.c.write(' * %s\n'%doc_bits[key])
+        for key in sorted(doc_bits.keys(), key=utils.version_cmp_key):
+            self.c.write(' * %s\n'%doc_bits[key])
+
         self.c.write(self.docbook_gen.expand(
                 ' *\n'
                 ' * Virtual table for the D-Bus interface #%s.\n'
@@ -1649,7 +1651,7 @@ class CodeGenerator:
                          '    g_variant_new ("(ssv)", "%s", info->parent_struct.name, variant),\n'
                          '    G_DBUS_CALL_FLAGS_NONE,\n'
                          '    -1,\n'
-                         '    NULL, (GAsyncReadyCallback) %s_proxy_set_property_cb, (gpointer) info);\n'
+                         '    NULL, (GAsyncReadyCallback) %s_proxy_set_property_cb, (GDBusPropertyInfo *) &info->parent_struct);\n'
                          '  g_variant_unref (variant);\n'
                          %(len(i.properties), i.name_lower, i.name, i.name_lower))
         self.c.write('}\n'
@@ -1670,7 +1672,7 @@ class CodeGenerator:
                      '  guint n;\n'
                      '  guint signal_id;\n');
         # Note: info could be NULL if we are talking to a newer version of the interface
-        self.c.write('  info = (_ExtendedGDBusSignalInfo *) g_dbus_interface_info_lookup_signal ((GDBusInterfaceInfo *) &_%s_interface_info, signal_name);\n'
+        self.c.write('  info = (_ExtendedGDBusSignalInfo *) g_dbus_interface_info_lookup_signal ((GDBusInterfaceInfo *) &_%s_interface_info.parent_struct, signal_name);\n'
                      '  if (info == NULL)\n'
                      '    return;\n'
                      %(i.name_lower))
@@ -1719,7 +1721,7 @@ class CodeGenerator:
                      '  g_variant_get (changed_properties, "a{sv}", &iter);\n'
                      '  while (g_variant_iter_next (iter, "{&sv}", &key, NULL))\n'
                      '    {\n'
-                     '      info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info, key);\n'
+                     '      info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info.parent_struct, key);\n'
                      '      g_datalist_remove_data (&proxy->priv->qdata, key);\n'
                      '      if (info != NULL)\n'
                      '        g_object_notify (G_OBJECT (proxy), info->hyphen_name);\n'
@@ -1727,7 +1729,7 @@ class CodeGenerator:
                      '  g_variant_iter_free (iter);\n'
                      '  for (n = 0; invalidated_properties[n] != NULL; n++)\n'
                      '    {\n'
-                     '      info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info, invalidated_properties[n]);\n'
+                     '      info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info.parent_struct, invalidated_properties[n]);\n'
                      '      g_datalist_remove_data (&proxy->priv->qdata, invalidated_properties[n]);\n'
                      '      if (info != NULL)\n'
                      '        g_object_notify (G_OBJECT (proxy), info->hyphen_name);\n'
@@ -2155,7 +2157,7 @@ class CodeGenerator:
                      '  GVariant *ret;\n'
                      %(i.name_lower, i.camel_name, i.ns_upper, i.name_upper))
         self.c.write('  ret = NULL;\n'
-                     '  info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info, property_name);\n'
+                     '  info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info.parent_struct, property_name);\n'
                      '  g_assert (info != NULL);\n'
                      '  pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (skeleton), info->hyphen_name);\n'
                      '  if (pspec == NULL)\n'
@@ -2192,7 +2194,7 @@ class CodeGenerator:
                      '  gboolean ret;\n'
                      %(i.name_lower, i.camel_name, i.ns_upper, i.name_upper))
         self.c.write('  ret = FALSE;\n'
-                     '  info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info, property_name);\n'
+                     '  info = (_ExtendedGDBusPropertyInfo *) g_dbus_interface_info_lookup_property ((GDBusInterfaceInfo *) &_%s_interface_info.parent_struct, property_name);\n'
                      '  g_assert (info != NULL);\n'
                      '  pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (skeleton), info->hyphen_name);\n'
                      '  if (pspec == NULL)\n'
@@ -2418,15 +2420,15 @@ class CodeGenerator:
                          '    }\n'
                          '  if (num_changes > 0)\n'
                          '    {\n'
-                         '      GList *connections, *l;\n'
+                         '      GList *connections, *ll;\n'
                          '      GVariant *signal_variant;'
                          '\n'
                          '      signal_variant = g_variant_ref_sink (g_variant_new ("(sa{sv}as)", "%s",\n'
                          '                                           &builder, &invalidated_builder));\n'
                          '      connections = g_dbus_interface_skeleton_get_connections (G_DBUS_INTERFACE_SKELETON (skeleton));\n'
-                         '      for (l = connections; l != NULL; l = l->next)\n'
+                         '      for (ll = connections; ll != NULL; ll = ll->next)\n'
                          '        {\n'
-                         '          GDBusConnection *connection = l->data;\n'
+                         '          GDBusConnection *connection = ll->data;\n'
                          '\n'
                          '          g_dbus_connection_emit_signal (connection,\n'
                          '                                         NULL, g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (skeleton)),\n'

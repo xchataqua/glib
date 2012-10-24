@@ -6,9 +6,9 @@
   <title>The GObject base class</title>
 
   <para>
-    The two previous chapters discussed the details of GLib's Dynamic Type System
-    and its signal control system. The GObject library also contains an implementation
-    for a base fundamental type named <link linkend="GObject"><type>GObject</type></link>.
+    The previous chapter discussed the details of GLib's Dynamic Type System.
+    The GObject library also contains an implementation for a base fundamental
+    type named <link linkend="GObject"><type>GObject</type></link>.
   </para>
 
   <para>
@@ -264,7 +264,7 @@ MamanBar *bar = g_object_new (MAMAN_TYPE_BAR, NULL);
       The memory-management API for GObjects is a bit complicated but the idea behind it
       is pretty simple: the goal is to provide a flexible model based on reference counting
       which can be integrated in applications which use or require different memory management
-      models (such as garbage collection, aso...). The methods which are used to
+      models (such as garbage collection). The methods which are used to
       manipulate this reference count are described below.
 <programlisting>
 /*

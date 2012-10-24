@@ -303,7 +303,7 @@ next_async_callback_wrapper (GObject      *source_object,
  * g_file_enumerator_next_files_async:
  * @enumerator: a #GFileEnumerator.
  * @num_files: the number of file info objects to request
- * @io_priority: the <link linkend="gioscheduler">io priority</link> 
+ * @io_priority: the <link linkend="io-priority">io priority</link>
  *     of the request. 
  * @cancellable: (allow-none): optional #GCancellable object, %NULL to ignore.
  * @callback: (scope async): a #GAsyncReadyCallback to call when the request is satisfied
@@ -400,20 +400,16 @@ g_file_enumerator_next_files_finish (GFileEnumerator  *enumerator,
 				     GError          **error)
 {
   GFileEnumeratorClass *class;
-  GSimpleAsyncResult *simple;
   
   g_return_val_if_fail (G_IS_FILE_ENUMERATOR (enumerator), NULL);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), NULL);
   
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return NULL;
-      
+  if (g_async_result_legacy_propagate_error (result, error))
+    return NULL;
+  else if (g_async_result_is_tagged (result, g_file_enumerator_next_files_async))
+    { 
       /* Special case read of 0 files */
-      if (g_simple_async_result_get_source_tag (simple) == g_file_enumerator_next_files_async)
-	return NULL;
+      return NULL;
     }
   
   class = G_FILE_ENUMERATOR_GET_CLASS (enumerator);
@@ -515,19 +511,14 @@ g_file_enumerator_close_finish (GFileEnumerator  *enumerator,
 				GAsyncResult     *result,
 				GError          **error)
 {
-  GSimpleAsyncResult *simple;
   GFileEnumeratorClass *class;
 
   g_return_val_if_fail (G_IS_FILE_ENUMERATOR (enumerator), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), FALSE);
   
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
-    }
-  
+  if (g_async_result_legacy_propagate_error (result, error))
+    return FALSE;
+
   class = G_FILE_ENUMERATOR_GET_CLASS (enumerator);
   return class->close_finish (enumerator, result, error);
 }
@@ -693,6 +684,9 @@ g_file_enumerator_real_next_files_finish (GFileEnumerator                *enumer
   g_warn_if_fail (g_simple_async_result_get_source_tag (simple) == 
 	    g_file_enumerator_real_next_files_async);
 
+  if (g_simple_async_result_propagate_error (simple, error))
+    return NULL;
+
   op = g_simple_async_result_get_op_res_gpointer (simple);
 
   res = op->files;
@@ -750,7 +744,12 @@ g_file_enumerator_real_close_finish (GFileEnumerator  *enumerator,
                                      GError          **error)
 {
   GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
+
   g_warn_if_fail (g_simple_async_result_get_source_tag (simple) == 
 	    g_file_enumerator_real_close_async);
+
+  if (g_simple_async_result_propagate_error (simple, error))
+    return FALSE;
+
   return TRUE;
 }

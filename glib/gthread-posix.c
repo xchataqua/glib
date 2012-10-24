@@ -139,7 +139,7 @@ g_mutex_get_impl (GMutex *mutex)
  * This function is useful to initialize a mutex that has been
  * allocated on the stack, or as part of a larger structure.
  * It is not necessary to initialize a mutex that has been
- * created that has been statically allocated.
+ * statically allocated.
  *
  * |[
  *   typedef struct {
@@ -1172,7 +1172,9 @@ void
 g_system_thread_set_name (const gchar *name)
 {
 #ifdef HAVE_SYS_PRCTL_H
+#ifdef PR_SET_NAME
   prctl (PR_SET_NAME, name, 0, 0, 0, 0);
+#endif
 #endif
 }
 

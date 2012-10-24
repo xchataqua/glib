@@ -109,6 +109,14 @@ test_class_init (TestClass *klass)
 
   klass->all_types = all_types_handler;
 
+  g_signal_new ("simple",
+                G_TYPE_FROM_CLASS (klass),
+                G_SIGNAL_RUN_LAST,
+                0,
+                NULL, NULL,
+                NULL,
+                G_TYPE_NONE,
+                0);
   g_signal_new ("generic-marshaller-1",
                 G_TYPE_FROM_CLASS (klass),
                 G_SIGNAL_RUN_LAST,
@@ -762,6 +770,9 @@ test_all_types (void)
   g_assert_cmpint (all_type_handlers_count, ==, 3 + 5 + 5);
 
   g_object_unref (test);
+  g_param_spec_unref (param);
+  g_bytes_unref (bytes);
+  g_variant_unref (var);
 }
 
 static void
@@ -797,18 +808,45 @@ test_connect (void)
   g_object_unref (test);
 }
 
+static void
+simple_handler1 (GObject *sender,
+                 GObject *target)
+{
+  g_object_unref (target);
+}
+
+static void
+simple_handler2 (GObject *sender,
+                 GObject *target)
+{
+  g_object_unref (target);
+}
+
+static void
+test_destroy_target_object (void)
+{
+  Test *sender, *target1, *target2;
+
+  sender = g_object_new (test_get_type (), NULL);
+  target1 = g_object_new (test_get_type (), NULL);
+  target2 = g_object_new (test_get_type (), NULL);
+  g_signal_connect_object (sender, "simple", G_CALLBACK (simple_handler1), target1, 0);
+  g_signal_connect_object (sender, "simple", G_CALLBACK (simple_handler2), target2, 0);
+  g_signal_emit_by_name (sender, "simple");
+  g_object_unref (sender);
+}
+
 /* --- */
 
 int
 main (int argc,
      char *argv[])
 {
-  g_type_init ();
-
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/gobject/signals/all-types", test_all_types);
   g_test_add_func ("/gobject/signals/variant", test_variant_signal);
+  g_test_add_func ("/gobject/signals/destroy-target-object", test_destroy_target_object);
   g_test_add_func ("/gobject/signals/generic-marshaller-1", test_generic_marshaller_signal_1);
   g_test_add_func ("/gobject/signals/generic-marshaller-2", test_generic_marshaller_signal_2);
   g_test_add_func ("/gobject/signals/generic-marshaller-enum-return-signed", test_generic_marshaller_signal_enum_return_signed);

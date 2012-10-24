@@ -41,7 +41,9 @@ G_BEGIN_DECLS
 typedef struct _GMenuItem GMenuItem;
 typedef struct _GMenu     GMenu;
 
+GLIB_AVAILABLE_IN_2_32
 GType       g_menu_get_type                         (void) G_GNUC_CONST;
+GLIB_AVAILABLE_IN_2_32
 GMenu *     g_menu_new                              (void);
 
 void        g_menu_freeze                           (GMenu       *menu);
@@ -94,11 +96,28 @@ GType       g_menu_item_get_type                    (void) G_GNUC_CONST;
 GMenuItem * g_menu_item_new                         (const gchar *label,
                                                      const gchar *detailed_action);
 
+GLIB_AVAILABLE_IN_2_34
+GMenuItem * g_menu_item_new_from_model              (GMenuModel  *model,
+                                                     gint         item_index);
+
 GMenuItem * g_menu_item_new_submenu                 (const gchar *label,
                                                      GMenuModel  *submenu);
 
 GMenuItem * g_menu_item_new_section                 (const gchar *label,
                                                      GMenuModel  *section);
+
+GLIB_AVAILABLE_IN_2_34
+GVariant *  g_menu_item_get_attribute_value         (GMenuItem   *menu_item,
+                                                     const gchar *attribute,
+                                                     const GVariantType *expected_type);
+GLIB_AVAILABLE_IN_2_34
+gboolean    g_menu_item_get_attribute               (GMenuItem   *menu_item,
+                                                     const gchar *attribute,
+                                                     const gchar *format_string,
+                                                     ...);
+GLIB_AVAILABLE_IN_2_34
+GMenuModel *g_menu_item_get_link                    (GMenuItem   *menu_item,
+                                                     const gchar *link);
 
 void        g_menu_item_set_attribute_value         (GMenuItem   *menu_item,
                                                      const gchar *attribute,

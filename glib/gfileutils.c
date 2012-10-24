@@ -459,11 +459,7 @@ g_file_test (const gchar *filename,
 #endif
 }
 
-GQuark
-g_file_error_quark (void)
-{
-  return g_quark_from_static_string ("g-file-error-quark");
-}
+G_DEFINE_QUARK (g-file-error-quark, g_file_error)
 
 /**
  * g_file_error_from_errno:
@@ -1166,7 +1162,6 @@ write_to_temp_file (const gchar  *contents,
 		   display_name, 
 		   g_strerror (save_errno));
 
-      fclose (file);
       g_unlink (tmp_name);
       
       goto out;

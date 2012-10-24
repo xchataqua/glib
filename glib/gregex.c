@@ -88,6 +88,18 @@
  * unescaped "#" outside a character class is encountered. This indicates
  * a comment that lasts until after the next newline.
  *
+ * When setting the %G_REGEX_JAVASCRIPT_COMPAT flag, pattern syntax and pattern
+ * matching is changed to be compatible with the way that regular expressions
+ * work in JavaScript. More precisely, a lonely ']' character in the pattern
+ * is a syntax error; the '\x' escape only allows 0 to 2 hexadecimal digits, and
+ * you must use the '\u' escape sequence with 4 hex digits to specify a unicode
+ * codepoint instead of '\x' or 'x{....}'. If '\x' or '\u' are not followed by
+ * the specified number of hex digits, they match 'x' and 'u' literally; also
+ * '\U' always matches 'U' instead of being an error in the pattern. Finally,
+ * pattern matching is modified so that back references to an unset subpattern
+ * group produces a match with the empty string instead of an error. See
+ * <ulink>man:pcreapi(3)</ulink> for more information.
+ *
  * Creating and manipulating the same #GRegex structure from different
  * threads is not a problem as #GRegex does not modify its internal
  * state between creation and destruction, on the other hand #GMatchInfo
@@ -109,30 +121,85 @@
                               G_REGEX_RAW               | \
                               G_REGEX_NO_AUTO_CAPTURE   | \
                               G_REGEX_OPTIMIZE          | \
+                              G_REGEX_FIRSTLINE         | \
                               G_REGEX_DUPNAMES          | \
                               G_REGEX_NEWLINE_CR        | \
                               G_REGEX_NEWLINE_LF        | \
-                              G_REGEX_NEWLINE_CRLF)
+                              G_REGEX_NEWLINE_CRLF      | \
+                              G_REGEX_NEWLINE_ANYCRLF   | \
+                              G_REGEX_BSR_ANYCRLF       | \
+                              G_REGEX_JAVASCRIPT_COMPAT)
+
+/* Mask of all GRegexCompileFlags values that are (not) passed trough to PCRE */
+#define G_REGEX_COMPILE_PCRE_MASK (G_REGEX_COMPILE_MASK & ~G_REGEX_COMPILE_NONPCRE_MASK)
+#define G_REGEX_COMPILE_NONPCRE_MASK (G_REGEX_RAW              | \
+                                      G_REGEX_OPTIMIZE)
 
 /* Mask of all the possible values for GRegexMatchFlags. */
-#define G_REGEX_MATCH_MASK (G_REGEX_MATCH_ANCHORED      | \
-                            G_REGEX_MATCH_NOTBOL        | \
-                            G_REGEX_MATCH_NOTEOL        | \
-                            G_REGEX_MATCH_NOTEMPTY      | \
-                            G_REGEX_MATCH_PARTIAL       | \
-                            G_REGEX_MATCH_NEWLINE_CR    | \
-                            G_REGEX_MATCH_NEWLINE_LF    | \
-                            G_REGEX_MATCH_NEWLINE_CRLF  | \
-                            G_REGEX_MATCH_NEWLINE_ANY)
+#define G_REGEX_MATCH_MASK (G_REGEX_MATCH_ANCHORED         | \
+                            G_REGEX_MATCH_NOTBOL           | \
+                            G_REGEX_MATCH_NOTEOL           | \
+                            G_REGEX_MATCH_NOTEMPTY         | \
+                            G_REGEX_MATCH_PARTIAL          | \
+                            G_REGEX_MATCH_NEWLINE_CR       | \
+                            G_REGEX_MATCH_NEWLINE_LF       | \
+                            G_REGEX_MATCH_NEWLINE_CRLF     | \
+                            G_REGEX_MATCH_NEWLINE_ANY      | \
+                            G_REGEX_MATCH_NEWLINE_ANYCRLF  | \
+                            G_REGEX_MATCH_BSR_ANYCRLF      | \
+                            G_REGEX_MATCH_BSR_ANY          | \
+                            G_REGEX_MATCH_PARTIAL_SOFT     | \
+                            G_REGEX_MATCH_PARTIAL_HARD     | \
+                            G_REGEX_MATCH_NOTEMPTY_ATSTART)
+
+/* we rely on these flags having the same values */
+G_STATIC_ASSERT (G_REGEX_CASELESS          == PCRE_CASELESS);
+G_STATIC_ASSERT (G_REGEX_MULTILINE         == PCRE_MULTILINE);
+G_STATIC_ASSERT (G_REGEX_DOTALL            == PCRE_DOTALL);
+G_STATIC_ASSERT (G_REGEX_EXTENDED          == PCRE_EXTENDED);
+G_STATIC_ASSERT (G_REGEX_ANCHORED          == PCRE_ANCHORED);
+G_STATIC_ASSERT (G_REGEX_DOLLAR_ENDONLY    == PCRE_DOLLAR_ENDONLY);
+G_STATIC_ASSERT (G_REGEX_UNGREEDY          == PCRE_UNGREEDY);
+G_STATIC_ASSERT (G_REGEX_NO_AUTO_CAPTURE   == PCRE_NO_AUTO_CAPTURE);
+G_STATIC_ASSERT (G_REGEX_FIRSTLINE         == PCRE_FIRSTLINE);
+G_STATIC_ASSERT (G_REGEX_DUPNAMES          == PCRE_DUPNAMES);
+G_STATIC_ASSERT (G_REGEX_NEWLINE_CR        == PCRE_NEWLINE_CR);
+G_STATIC_ASSERT (G_REGEX_NEWLINE_LF        == PCRE_NEWLINE_LF);
+G_STATIC_ASSERT (G_REGEX_NEWLINE_CRLF      == PCRE_NEWLINE_CRLF);
+G_STATIC_ASSERT (G_REGEX_NEWLINE_ANYCRLF   == PCRE_NEWLINE_ANYCRLF);
+G_STATIC_ASSERT (G_REGEX_BSR_ANYCRLF       == PCRE_BSR_ANYCRLF);
+G_STATIC_ASSERT (G_REGEX_JAVASCRIPT_COMPAT == PCRE_JAVASCRIPT_COMPAT);
+
+G_STATIC_ASSERT (G_REGEX_MATCH_ANCHORED         == PCRE_ANCHORED);
+G_STATIC_ASSERT (G_REGEX_MATCH_NOTBOL           == PCRE_NOTBOL);
+G_STATIC_ASSERT (G_REGEX_MATCH_NOTEOL           == PCRE_NOTEOL);
+G_STATIC_ASSERT (G_REGEX_MATCH_NOTEMPTY         == PCRE_NOTEMPTY);
+G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL          == PCRE_PARTIAL);
+G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_CR       == PCRE_NEWLINE_CR);
+G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_LF       == PCRE_NEWLINE_LF);
+G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_CRLF     == PCRE_NEWLINE_CRLF);
+G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_ANY      == PCRE_NEWLINE_ANY);
+G_STATIC_ASSERT (G_REGEX_MATCH_NEWLINE_ANYCRLF  == PCRE_NEWLINE_ANYCRLF);
+G_STATIC_ASSERT (G_REGEX_MATCH_BSR_ANYCRLF      == PCRE_BSR_ANYCRLF);
+G_STATIC_ASSERT (G_REGEX_MATCH_BSR_ANY          == PCRE_BSR_UNICODE);
+G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL_SOFT     == PCRE_PARTIAL_SOFT);
+G_STATIC_ASSERT (G_REGEX_MATCH_PARTIAL_HARD     == PCRE_PARTIAL_HARD);
+G_STATIC_ASSERT (G_REGEX_MATCH_NOTEMPTY_ATSTART == PCRE_NOTEMPTY_ATSTART);
+
+/* These PCRE flags are unused or not exposed publically in GRegexFlags, so
+ * it should be ok to reuse them for different things.
+ */
+G_STATIC_ASSERT (G_REGEX_OPTIMIZE          == PCRE_NO_UTF8_CHECK);
+G_STATIC_ASSERT (G_REGEX_RAW               == PCRE_UTF8);
 
 /* if the string is in UTF-8 use g_utf8_ functions, else use
  * use just +/- 1. */
-#define NEXT_CHAR(re, s) (((re)->compile_opts & PCRE_UTF8) ? \
-                                g_utf8_next_char (s) : \
-                                ((s) + 1))
-#define PREV_CHAR(re, s) (((re)->compile_opts & PCRE_UTF8) ? \
-                                g_utf8_prev_char (s) : \
-                                ((s) - 1))
+#define NEXT_CHAR(re, s) (((re)->compile_opts & G_REGEX_RAW) ? \
+                                ((s) + 1) : \
+                                g_utf8_next_char (s))
+#define PREV_CHAR(re, s) (((re)->compile_opts & G_REGEX_RAW) ? \
+                                ((s) - 1) : \
+                                g_utf8_prev_char (s))
 
 struct _GMatchInfo
 {
@@ -228,14 +295,14 @@ match_error (gint errcode)
     case PCRE_ERROR_DFA_RECURSE:
     case PCRE_ERROR_RECURSIONLIMIT:
       return _("recursion limit reached");
-    case PCRE_ERROR_NULLWSLIMIT:
-      return _("workspace limit for empty substrings reached");
     case PCRE_ERROR_BADNEWLINE:
       return _("invalid combination of newline flags");
     case PCRE_ERROR_BADOFFSET:
       return _("bad offset");
     case PCRE_ERROR_SHORTUTF8:
       return _("short utf8");
+    case PCRE_ERROR_RECURSELOOP:
+      return _("recursion loop");
     default:
       break;
     }
@@ -265,14 +332,7 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
       *errmsg = _("\\c at end of pattern");
       break;
     case G_REGEX_ERROR_UNRECOGNIZED_ESCAPE:
-      *errmsg = _("unrecognized character follows \\");
-      break;
-    case 137:
-      /* A number of Perl escapes are not handled by PCRE.
-       * Therefore it explicitly raises ERR37.
-       */
-      *errcode = G_REGEX_ERROR_UNRECOGNIZED_ESCAPE;
-      *errmsg = _("case-changing escapes (\\l, \\L, \\u, \\U) are not allowed here");
+      *errmsg = _("unrecognized character following \\");
       break;
     case G_REGEX_ERROR_QUANTIFIERS_OUT_OF_ORDER:
       *errmsg = _("numbers out of order in {} quantifier");
@@ -292,33 +352,18 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
     case G_REGEX_ERROR_NOTHING_TO_REPEAT:
       *errmsg = _("nothing to repeat");
       break;
+    case 111: /* internal error: unexpected repeat */
+      *errcode = G_REGEX_ERROR_INTERNAL;
+      *errmsg = _("unexpected repeat");
+      break;
     case G_REGEX_ERROR_UNRECOGNIZED_CHARACTER:
-      *errmsg = _("unrecognized character after (?");
-      break;
-    case 124:
-      *errcode = G_REGEX_ERROR_UNRECOGNIZED_CHARACTER;
-      *errmsg = _("unrecognized character after (?<");
-      break;
-    case 141:
-      *errcode = G_REGEX_ERROR_UNRECOGNIZED_CHARACTER;
-      *errmsg = _("unrecognized character after (?P");
+      *errmsg = _("unrecognized character after (? or (?-");
       break;
     case G_REGEX_ERROR_POSIX_NAMED_CLASS_OUTSIDE_CLASS:
       *errmsg = _("POSIX named classes are supported only within a class");
       break;
     case G_REGEX_ERROR_UNMATCHED_PARENTHESIS:
       *errmsg = _("missing terminating )");
-      break;
-    case 122:
-      *errcode = G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
-      *errmsg = _(") without opening (");
-      break;
-    case 129:
-      *errcode = G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
-      /* translators: '(?R' and '(?[+-]digits' are both meant as (groups of)
-       * sequences here, '(?-54' would be an example for the second group.
-       */
-      *errmsg = _("(?R or (?[+-]digits must be followed by )");
       break;
     case G_REGEX_ERROR_INEXISTENT_SUBPATTERN_REFERENCE:
       *errmsg = _("reference to non-existent subpattern");
@@ -327,10 +372,22 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
       *errmsg = _("missing ) after comment");
       break;
     case G_REGEX_ERROR_EXPRESSION_TOO_LARGE:
-      *errmsg = _("regular expression too large");
+      *errmsg = _("regular expression is too large");
       break;
     case G_REGEX_ERROR_MEMORY_ERROR:
       *errmsg = _("failed to get memory");
+      break;
+    case 122: /* unmatched parentheses */
+      *errcode = G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
+      *errmsg = _(") without opening (");
+      break;
+    case 123: /* internal error: code overflow */
+      *errcode = G_REGEX_ERROR_INTERNAL;
+      *errmsg = _("code overflow");
+      break;
+    case 124: /* "unrecognized character after (?<\0 */
+      *errcode = G_REGEX_ERROR_UNRECOGNIZED_CHARACTER;
+      *errmsg = _("unrecognized character after (?<");
       break;
     case G_REGEX_ERROR_VARIABLE_LENGTH_LOOKBEHIND:
       *errmsg = _("lookbehind assertion is not fixed length");
@@ -343,6 +400,13 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
       break;
     case G_REGEX_ERROR_ASSERTION_EXPECTED:
       *errmsg = _("assertion expected after (?(");
+      break;
+    case 129:
+      *errcode = G_REGEX_ERROR_UNMATCHED_PARENTHESIS;
+      /* translators: '(?R' and '(?[+-]digits' are both meant as (groups of)
+       * sequences here, '(?-54' would be an example for the second group.
+       */
+      *errmsg = _("(?R or (?[+-]digits must be followed by )");
       break;
     case G_REGEX_ERROR_UNKNOWN_POSIX_CLASS_NAME:
       *errmsg = _("unknown POSIX class name");
@@ -359,8 +423,19 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
     case G_REGEX_ERROR_SINGLE_BYTE_MATCH_IN_LOOKBEHIND:
       *errmsg = _("\\C not allowed in lookbehind assertion");
       break;
+    case 137: /* PCRE does not support \\L, \\l, \\N{name}, \\U, or \\u\0 */
+      /* A number of Perl escapes are not handled by PCRE.
+       * Therefore it explicitly raises ERR37.
+       */
+      *errcode = G_REGEX_ERROR_UNRECOGNIZED_ESCAPE;
+      *errmsg = _("escapes \\L, \\l, \\N{name}, \\U, and \\u are not supported");
+      break;
     case G_REGEX_ERROR_INFINITE_LOOP:
       *errmsg = _("recursive call could loop indefinitely");
+      break;
+    case 141: /* unrecognized character after (?P\0 */
+      *errcode = G_REGEX_ERROR_UNRECOGNIZED_CHARACTER;
+      *errmsg = _("unrecognized character after (?P");
       break;
     case G_REGEX_ERROR_MISSING_SUBPATTERN_NAME_TERMINATOR:
       *errmsg = _("missing terminator in subpattern name");
@@ -383,54 +458,93 @@ translate_compile_error (gint *errcode, const gchar **errmsg)
     case G_REGEX_ERROR_INVALID_OCTAL_VALUE:
       *errmsg = _("octal value is greater than \\377");
       break;
+    case 152: /* internal error: overran compiling workspace */
+      *errcode = G_REGEX_ERROR_INTERNAL;
+      *errmsg = _("overran compiling workspace");
+      break;
+    case 153: /* internal error: previously-checked referenced subpattern not found */
+      *errcode = G_REGEX_ERROR_INTERNAL;
+      *errmsg = _("previously-checked referenced subpattern not found");
+      break;
     case G_REGEX_ERROR_TOO_MANY_BRANCHES_IN_DEFINE:
       *errmsg = _("DEFINE group contains more than one branch");
-      break;
-    case G_REGEX_ERROR_DEFINE_REPETION:
-      *errmsg = _("repeating a DEFINE group is not allowed");
       break;
     case G_REGEX_ERROR_INCONSISTENT_NEWLINE_OPTIONS:
       *errmsg = _("inconsistent NEWLINE options");
       break;
     case G_REGEX_ERROR_MISSING_BACK_REFERENCE:
-      *errmsg = _("\\g is not followed by a braced name or an optionally "
-                 "braced non-zero number");
+      *errmsg = _("\\g is not followed by a braced, angle-bracketed, or quoted name or "
+                  "number, or by a plain number");
       break;
-    case 11:
-      *errcode = G_REGEX_ERROR_INTERNAL;
-      *errmsg = _("unexpected repeat");
+    case G_REGEX_ERROR_INVALID_RELATIVE_REFERENCE:
+      *errmsg = _("a numbered reference must not be zero");
       break;
-    case 23:
-      *errcode = G_REGEX_ERROR_INTERNAL;
-      *errmsg = _("code overflow");
+    case G_REGEX_ERROR_BACKTRACKING_CONTROL_VERB_ARGUMENT_FORBIDDEN:
+      *errmsg = _("an argument is not allowed for (*ACCEPT), (*FAIL), or (*COMMIT)");
       break;
-    case 52:
-      *errcode = G_REGEX_ERROR_INTERNAL;
-      *errmsg = _("overran compiling workspace");
+    case G_REGEX_ERROR_UNKNOWN_BACKTRACKING_CONTROL_VERB:
+      *errmsg = _("(*VERB) not recognized");
       break;
-    case 53:
-      *errcode = G_REGEX_ERROR_INTERNAL;
-      *errmsg = _("previously-checked referenced subpattern not found");
+    case G_REGEX_ERROR_NUMBER_TOO_BIG:
+      *errmsg = _("number is too big");
       break;
-    case 16:
+    case G_REGEX_ERROR_MISSING_SUBPATTERN_NAME:
+      *errmsg = _("missing subpattern name after (?&");
+      break;
+    case G_REGEX_ERROR_MISSING_DIGIT:
+      *errmsg = _("digit expected after (?+");
+      break;
+    case G_REGEX_ERROR_INVALID_DATA_CHARACTER:
+      *errmsg = _("] is an invalid data character in JavaScript compatibility mode");
+      break;
+    case G_REGEX_ERROR_EXTRA_SUBPATTERN_NAME:
+      *errmsg = _("different names for subpatterns of the same number are not allowed");
+      break;
+    case G_REGEX_ERROR_BACKTRACKING_CONTROL_VERB_ARGUMENT_REQUIRED:
+      *errmsg = _("(*MARK) must have an argument");
+      break;
+    case G_REGEX_ERROR_INVALID_CONTROL_CHAR:
+      *errmsg = _( "\\c must be followed by an ASCII character");
+      break;
+    case G_REGEX_ERROR_MISSING_NAME:
+      *errmsg = _("\\k is not followed by a braced, angle-bracketed, or quoted name");
+      break;
+    case G_REGEX_ERROR_NOT_SUPPORTED_IN_CLASS:
+      *errmsg = _("\\N is not supported in a class");
+      break;
+    case G_REGEX_ERROR_TOO_MANY_FORWARD_REFERENCES:
+      *errmsg = _("too many forward references");
+      break;
+    case G_REGEX_ERROR_NAME_TOO_LONG:
+      *errmsg = _("name is too long in (*MARK), (*PRUNE), (*SKIP), or (*THEN)");
+      break;
+    case G_REGEX_ERROR_CHARACTER_VALUE_TOO_LARGE:
+      *errmsg = _("character value in \\u.... sequence is too large");
+      break;
+
+    case 116: /* erroffset passed as NULL */
       /* This should not happen as we never pass a NULL erroffset */
       g_warning ("erroffset passed as NULL");
       *errcode = G_REGEX_ERROR_COMPILE;
       break;
-    case 17:
+    case 117: /* unknown option bit(s) set */
       /* This should not happen as we check options before passing them
        * to pcre_compile2() */
       g_warning ("unknown option bit(s) set");
       *errcode = G_REGEX_ERROR_COMPILE;
       break;
-    case 32:
-    case 44:
-    case 45:
-      /* These errors should not happen as we are using an UTF8-enabled PCRE
+    case 132: /* this version of PCRE is compiled without UTF support */
+    case 144: /* invalid UTF-8 string */
+    case 145: /* support for \\P, \\p, and \\X has not been compiled */
+    case 167: /* this version of PCRE is not compiled with Unicode property support */
+    case 173: /* disallowed Unicode code point (>= 0xd800 && <= 0xdfff) */
+    case 174: /* invalid UTF-16 string */
+      /* These errors should not happen as we are using an UTF-8 and UCP-enabled PCRE
        * and we do not check if strings are valid */
-      g_warning ("%s", *errmsg);
-      *errcode = G_REGEX_ERROR_COMPILE;
+    case 170: /* internal error: unknown opcode in find_fixedlength() */
+      *errcode = G_REGEX_ERROR_INTERNAL;
       break;
+
     default:
       *errcode = G_REGEX_ERROR_COMPILE;
     }
@@ -746,13 +860,21 @@ g_match_info_get_match_count (const GMatchInfo *match_info)
  * able to raise an error as soon as a mistake is made.
  *
  * GRegex supports the concept of partial matching by means of the
- * #G_REGEX_MATCH_PARTIAL flag. When this is set the return code for
+ * #G_REGEX_MATCH_PARTIAL_SOFT and #G_REGEX_MATCH_PARTIAL_HARD flags.
+ * When they are used, the return code for
  * g_regex_match() or g_regex_match_full() is, as usual, %TRUE
  * for a complete match, %FALSE otherwise. But, when these functions
  * return %FALSE, you can check if the match was partial calling
  * g_match_info_is_partial_match().
  *
- * When using partial matching you cannot use g_match_info_fetch*().
+ * The difference between #G_REGEX_MATCH_PARTIAL_SOFT and 
+ * #G_REGEX_MATCH_PARTIAL_HARD is that when a partial match is encountered
+ * with #G_REGEX_MATCH_PARTIAL_SOFT, matching continues to search for a
+ * possible complete match, while with #G_REGEX_MATCH_PARTIAL_HARD matching
+ * stops at the partial match.
+ * When both #G_REGEX_MATCH_PARTIAL_SOFT and #G_REGEX_MATCH_PARTIAL_HARD
+ * are set, the latter takes precedence.
+ * See <ulink>man:pcrepartial</ulink> for more information on partial matching.
  *
  * Because of the way certain internal optimizations are implemented
  * the partial matching algorithm cannot be used with all patterns.
@@ -761,7 +883,8 @@ g_match_info_get_match_count (const GMatchInfo *match_info)
  * of occurrences is greater than one. Optional items such as "\d?"
  * (where the maximum is one) are permitted. Quantifiers with any values
  * are permitted after parentheses, so the invalid examples above can be
- * coded thus "(a){2,4}" and "(\d)+". If #G_REGEX_MATCH_PARTIAL is set
+ * coded thus "(a){2,4}" and "(\d)+". If #G_REGEX_MATCH_PARTIAL or 
+ * #G_REGEX_MATCH_PARTIAL_HARD is set
  * for a pattern that does not conform to the restrictions, matching
  * functions return an error.
  *
@@ -1076,9 +1199,9 @@ g_match_info_fetch_named_pos (const GMatchInfo *match_info,
  * The strings are fetched from the string passed to the match function,
  * so you cannot call this function after freeing the string.
  *
- * Returns: (allow-none): a %NULL-terminated array of gchar * pointers.
- *     It must be freed using g_strfreev(). If the previous match failed
- *     %NULL is returned
+ * Returns: (transfer full): a %NULL-terminated array of gchar *
+ *     pointers.  It must be freed using g_strfreev(). If the previous
+ *     match failed %NULL is returned
  *
  * Since: 2.14
  */
@@ -1106,16 +1229,7 @@ g_match_info_fetch_all (const GMatchInfo *match_info)
 
 /* GRegex */
 
-GQuark
-g_regex_error_quark (void)
-{
-  static GQuark error_quark = 0;
-
-  if (error_quark == 0)
-    error_quark = g_quark_from_static_string ("g-regex-error-quark");
-
-  return error_quark;
-}
+G_DEFINE_QUARK (g-regex-error-quark, g_regex_error)
 
 /**
  * g_regex_ref:
@@ -1187,8 +1301,9 @@ g_regex_new (const gchar         *pattern,
   gint erroffset;
   gint errcode;
   gboolean optimize = FALSE;
-  static gsize initialised;
+  static volatile gsize initialised = 0;
   unsigned long int pcre_compile_options;
+  GRegexCompileFlags nonpcre_compile_options;
 
   g_return_val_if_fail (pattern != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
@@ -1197,29 +1312,27 @@ g_regex_new (const gchar         *pattern,
 
   if (g_once_init_enter (&initialised))
     {
-      gint support;
-      const gchar *msg;
+      int supports_utf8, supports_ucp;
 
-      pcre_config (PCRE_CONFIG_UTF8, &support);
-      if (!support)
-        {
-          msg = N_("PCRE library is compiled without UTF8 support");
-          g_critical ("%s", msg);
-          g_set_error_literal (error, G_REGEX_ERROR, G_REGEX_ERROR_COMPILE, gettext (msg));
-          return NULL;
-        }
+      pcre_config (PCRE_CONFIG_UTF8, &supports_utf8);
+      if (!supports_utf8)
+        g_critical (_("PCRE library is compiled without UTF8 support"));
 
-      pcre_config (PCRE_CONFIG_UNICODE_PROPERTIES, &support);
-      if (!support)
-        {
-          msg = N_("PCRE library is compiled without UTF8 properties support");
-          g_critical ("%s", msg);
-          g_set_error_literal (error, G_REGEX_ERROR, G_REGEX_ERROR_COMPILE, gettext (msg));
-          return NULL;
-        }
+      pcre_config (PCRE_CONFIG_UNICODE_PROPERTIES, &supports_ucp);
+      if (!supports_ucp)
+        g_critical (_("PCRE library is compiled without UTF8 properties support"));
 
-      g_once_init_leave (&initialised, TRUE);
+      g_once_init_leave (&initialised, supports_utf8 && supports_ucp ? 1 : 2);
     }
+
+  if (G_UNLIKELY (initialised != 1)) 
+    {
+      g_set_error_literal (error, G_REGEX_ERROR, G_REGEX_ERROR_COMPILE, 
+                           _("PCRE library is compiled with incompatible options"));
+      return NULL;
+    }
+
+  nonpcre_compile_options = compile_options & G_REGEX_COMPILE_NONPCRE_MASK;
 
   /* G_REGEX_OPTIMIZE has the same numeric value of PCRE_NO_UTF8_CHECK,
    * as we do not need to wrap PCRE_NO_UTF8_CHECK. */
@@ -1249,6 +1362,12 @@ g_regex_new (const gchar         *pattern,
     }
 
   compile_options |= PCRE_UCP;
+
+  /* PCRE_BSR_UNICODE is the default for the internal PCRE but
+   * possibly not for the system one.
+   */
+  if (~compile_options & G_REGEX_BSR_ANYCRLF)
+    compile_options |= PCRE_BSR_UNICODE;
 
   /* compile the pattern */
   re = pcre_compile2 (pattern, compile_options, &errcode,
@@ -1280,7 +1399,13 @@ g_regex_new (const gchar         *pattern,
    * compile options, e.g. "(?i)foo" will make the pcre structure store
    * PCRE_CASELESS even though it wasn't explicitly given for compilation. */
   pcre_fullinfo (re, NULL, PCRE_INFO_OPTIONS, &pcre_compile_options);
-  compile_options = pcre_compile_options;
+  compile_options = pcre_compile_options & G_REGEX_COMPILE_PCRE_MASK;
+
+  /* Don't leak PCRE_NEWLINE_ANY, which is part of PCRE_NEWLINE_ANYCRLF */
+  if ((pcre_compile_options & PCRE_NEWLINE_ANYCRLF) != PCRE_NEWLINE_ANYCRLF)
+    compile_options &= ~PCRE_NEWLINE_ANY;
+
+  compile_options |= nonpcre_compile_options;
 
   if (!(compile_options & G_REGEX_DUPNAMES))
     {
@@ -1382,6 +1507,27 @@ g_regex_get_capture_count (const GRegex *regex)
 }
 
 /**
+ * g_regex_get_has_cr_or_lf:
+ * @regex: a #GRegex structure
+ *
+ * Checks whether the pattern contains explicit CR or LF references.
+ *
+ * Returns: %TRUE if the pattern contains explicit CR or LF references
+ *
+ * Since: 2.34
+ */
+gboolean
+g_regex_get_has_cr_or_lf (const GRegex *regex)
+{
+  gint value;
+
+  pcre_fullinfo (regex->pcre_re, regex->extra,
+                 PCRE_INFO_HASCRORLF, &value);
+
+  return !!value;
+}
+
+/**
  * g_regex_get_compile_flags:
  * @regex: a #GRegex
  *
@@ -1414,7 +1560,7 @@ g_regex_get_match_flags (const GRegex *regex)
 {
   g_return_val_if_fail (regex != NULL, 0);
 
-  return regex->match_opts;
+  return regex->match_opts & G_REGEX_MATCH_MASK;
 }
 
 /**
@@ -1829,7 +1975,8 @@ g_regex_get_string_number (const GRegex *regex,
  * characters. For example splitting "ab c" using as a separator
  * "\s*", you will get "a", "b" and "c".
  *
- * Returns: a %NULL-terminated array of strings. Free it using g_strfreev()
+ * Returns: (transfer full): a %NULL-terminated array of strings. Free
+ * it using g_strfreev()
  *
  * Since: 2.14
  **/
@@ -1875,7 +2022,8 @@ g_regex_split_simple (const gchar        *pattern,
  * For example splitting "ab c" using as a separator "\s*", you will get
  * "a", "b" and "c".
  *
- * Returns: a %NULL-terminated gchar ** array. Free it using g_strfreev()
+ * Returns: (transfer full): a %NULL-terminated gchar ** array. Free
+ * it using g_strfreev()
  *
  * Since: 2.14
  **/
@@ -1921,7 +2069,8 @@ g_regex_split (const GRegex     *regex,
  * string and setting #G_REGEX_MATCH_NOTBOL in the case of a pattern
  * that begins with any kind of lookbehind assertion, such as "\b".
  *
- * Returns: a %NULL-terminated gchar ** array. Free it using g_strfreev()
+ * Returns: (transfer full): a %NULL-terminated gchar ** array. Free
+ * it using g_strfreev()
  *
  * Since: 2.14
  **/

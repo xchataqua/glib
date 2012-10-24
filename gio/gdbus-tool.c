@@ -625,7 +625,13 @@ handle_emit (gint        *argc,
       g_printerr (_("Error: signal not specified.\n"));
       goto out;
     }
+
   s = strrchr (opt_emit_signal, '.');
+  if (s == NULL)
+    {
+      g_printerr (_("Error: signal must be the fully-qualified name.\n"));
+      goto out;
+    }
   signal_name = g_strdup (s + 1);
   interface_name = g_strndup (opt_emit_signal, s - opt_emit_signal);
 
@@ -1941,8 +1947,6 @@ main (gint argc, gchar *argv[])
   ret = 1;
   completion_cur = NULL;
   completion_prev = NULL;
-
-  g_type_init ();
 
   if (argc < 2)
     {

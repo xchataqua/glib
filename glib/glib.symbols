@@ -169,6 +169,7 @@ g_checksum_get_string
 g_checksum_get_digest
 g_compute_checksum_for_data
 g_compute_checksum_for_string
+g_compute_checksum_for_bytes
 g_completion_add_items
 g_completion_clear_items
 g_completion_complete
@@ -206,7 +207,9 @@ g_datalist_clear
 g_datalist_foreach
 g_datalist_get_data
 g_datalist_get_flags
+g_datalist_id_dup_data
 g_datalist_id_get_data
+g_datalist_id_replace_data
 g_datalist_id_remove_no_notify
 g_datalist_id_set_data_full
 g_datalist_set_flags
@@ -551,6 +554,7 @@ g_list_alloc
 g_list_append
 g_list_concat
 g_list_copy
+g_list_copy_deep
 g_list_delete_link
 g_list_find
 g_list_find_custom
@@ -663,6 +667,7 @@ g_mapped_file_new
 g_mapped_file_new_from_fd
 g_mapped_file_get_length
 g_mapped_file_get_contents
+g_mapped_file_get_bytes
 g_mapped_file_ref
 g_mapped_file_unref
 g_mapped_file_free
@@ -942,6 +947,7 @@ g_slist_alloc
 g_slist_append
 g_slist_concat
 g_slist_copy
+g_slist_copy_deep
 g_slist_delete_link
 g_slist_find
 g_slist_find_custom
@@ -978,6 +984,7 @@ g_spawn_command_line_async PRIVATE
 g_spawn_command_line_sync PRIVATE
 #endif
 g_spawn_error_quark
+g_spawn_exit_error_quark
 #ifndef _WIN64
 g_spawn_sync PRIVATE
 #endif
@@ -988,6 +995,7 @@ g_spawn_command_line_async_utf8
 g_spawn_command_line_sync_utf8
 g_spawn_sync_utf8
 #endif
+g_spawn_check_exit_status
 #if !defined(G_OS_UNIX) || defined(G_STDIO_NO_WRAP_ON_UNIX)
 /* gstdio wrappers */
 g_chmod
@@ -1082,6 +1090,7 @@ g_string_chunk_new
 g_string_equal
 g_string_erase
 g_string_free
+g_string_free_to_bytes
 g_string_hash
 g_string_insert
 g_string_insert_c
@@ -1177,13 +1186,16 @@ g_assertion_message_expr
 g_assertion_message_error
 g_strcmp0
 g_test_add_data_func
+g_test_add_data_func_full
 g_test_add_func
 g_test_add_vtable
+g_test_assert_expected_messages_internal
 g_test_bug
 g_test_bug_base
 g_test_config_vars
 g_test_create_case
 g_test_create_suite
+g_test_expect_message
 g_test_fail
 g_test_get_root
 g_test_init
@@ -1403,6 +1415,7 @@ g_regex_unref
 g_regex_get_pattern
 g_regex_get_max_backref
 g_regex_get_capture_count
+g_regex_get_has_cr_or_lf
 g_regex_get_string_number
 g_regex_get_compile_flags
 g_regex_get_match_flags
@@ -1549,6 +1562,7 @@ g_variant_builder_end
 g_variant_builder_new
 g_variant_builder_unref
 g_variant_builder_ref
+g_variant_check_format_string
 g_variant_new_va
 g_variant_get_va
 g_variant_new

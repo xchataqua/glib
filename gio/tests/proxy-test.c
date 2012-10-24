@@ -159,22 +159,18 @@ g_test_proxy_resolver_lookup_async (GProxyResolver      *resolver,
 				    gpointer             user_data)
 {
   GError *error = NULL;
-  GSimpleAsyncResult *simple;
+  GTask *task;
   gchar **proxies;
 
   proxies = g_test_proxy_resolver_lookup (resolver, uri, cancellable, &error);
 
-  simple = g_simple_async_result_new (G_OBJECT (resolver),
-				      callback, user_data,
-				      g_test_proxy_resolver_lookup_async);
-
+  task = g_task_new (resolver, NULL, callback, user_data);
   if (proxies == NULL)
-    g_simple_async_result_take_error (simple, error);
+    g_task_return_error (task, error);
   else
-    g_simple_async_result_set_op_res_gpointer (simple, proxies, (GDestroyNotify) g_strfreev);
+    g_task_return_pointer (task, proxies, (GDestroyNotify) g_strfreev);
 
-  g_simple_async_result_complete_in_idle (simple);
-  g_object_unref (simple);
+  g_object_unref (task);
 }
 
 static gchar **
@@ -182,19 +178,7 @@ g_test_proxy_resolver_lookup_finish (GProxyResolver     *resolver,
 				     GAsyncResult       *result,
 				     GError            **error)
 {
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-      gchar **proxies;
-
-      if (g_simple_async_result_propagate_error (simple, error))
-        return NULL;
-
-      proxies = g_simple_async_result_get_op_res_gpointer (simple);
-      return g_strdupv (proxies);
-    }
-
-  return NULL;
+  return g_task_propagate_pointer (G_TASK (result), error);
 }
 
 static void
@@ -292,24 +276,18 @@ g_proxy_base_connect_async (GProxy               *proxy,
 			    gpointer              user_data)
 {
   GError *error = NULL;
-  GSimpleAsyncResult *simple;
+  GTask *task;
   GIOStream *proxy_io_stream;
 
-  simple = g_simple_async_result_new (G_OBJECT (proxy),
-				      callback, user_data,
-				      g_proxy_base_connect_async);
+  task = g_task_new (proxy, NULL, callback, user_data);
 
   proxy_io_stream = g_proxy_connect (proxy, io_stream, proxy_address,
 				     cancellable, &error);
   if (proxy_io_stream)
-    {
-      g_simple_async_result_set_op_res_gpointer (simple, proxy_io_stream,
-						 g_object_unref);
-    }
+    g_task_return_pointer (task, proxy_io_stream, g_object_unref);
   else
-    g_simple_async_result_take_error (simple, error);
-  g_simple_async_result_complete_in_idle (simple);
-  g_object_unref (simple);
+    g_task_return_error (task, error);
+  g_object_unref (task);
 }
 
 static GIOStream *
@@ -317,12 +295,7 @@ g_proxy_base_connect_finish (GProxy        *proxy,
 			     GAsyncResult  *result,
 			     GError       **error)
 {
-  GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (result);
-
-  if (g_simple_async_result_propagate_error (simple, error))
-    return NULL;
-
-  return g_object_ref (g_simple_async_result_get_op_res_gpointer (simple));
+  return g_task_propagate_pointer (G_TASK (result), error);
 }
 
 static void
@@ -475,7 +448,7 @@ proxy_thread (gpointer user_data)
   gssize nread, nwrote;
   gchar command[2] = { 0, 0 };
   GMainContext *context;
-  GSource *source;
+  GSource *read_source, *write_source;
 
   context = g_main_context_new ();
   proxy->loop = g_main_loop_new (context, FALSE);
@@ -486,6 +459,7 @@ proxy_thread (gpointer user_data)
       if (!proxy->client_sock)
 	{
 	  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+          g_error_free (error);
 	  break;
 	}
       else
@@ -516,15 +490,13 @@ proxy_thread (gpointer user_data)
       g_socket_connect (proxy->server_sock, server.server_addr, NULL, &error);
       g_assert_no_error (error);
 
-      source = g_socket_create_source (proxy->client_sock, G_IO_IN, NULL);
-      g_source_set_callback (source, (GSourceFunc)proxy_bytes, proxy, NULL);
-      g_source_attach (source, context);
-      g_source_unref (source);
+      read_source = g_socket_create_source (proxy->client_sock, G_IO_IN, NULL);
+      g_source_set_callback (read_source, (GSourceFunc)proxy_bytes, proxy, NULL);
+      g_source_attach (read_source, context);
 
-      source = g_socket_create_source (proxy->server_sock, G_IO_IN, NULL);
-      g_source_set_callback (source, (GSourceFunc)proxy_bytes, proxy, NULL);
-      g_source_attach (source, context);
-      g_source_unref (source);
+      write_source = g_socket_create_source (proxy->server_sock, G_IO_IN, NULL);
+      g_source_set_callback (write_source, (GSourceFunc)proxy_bytes, proxy, NULL);
+      g_source_attach (write_source, context);
 
       g_main_loop_run (proxy->loop);
 
@@ -535,6 +507,11 @@ proxy_thread (gpointer user_data)
       g_socket_close (proxy->server_sock, &error);
       g_assert_no_error (error);
       g_clear_object (&proxy->server_sock);
+
+      g_source_destroy (read_source);
+      g_source_unref (read_source);
+      g_source_destroy (write_source);
+      g_source_unref (write_source);
     }
 
   g_main_loop_unref (proxy->loop);
@@ -542,6 +519,10 @@ proxy_thread (gpointer user_data)
 
   g_object_unref (proxy->server);
   g_object_unref (proxy->cancellable);
+
+  g_free (proxy->proxy_command);
+  g_free (proxy->supported_protocol);
+  g_free (proxy->uri);
 
   return NULL;
 }
@@ -608,6 +589,7 @@ echo_server_thread (gpointer user_data)
       if (!sock)
 	{
 	  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
+          g_error_free (error);
 	  break;
 	}
       else
@@ -633,6 +615,7 @@ echo_server_thread (gpointer user_data)
     }
 
   g_object_unref (data->server);
+  g_object_unref (data->server_addr);
   g_object_unref (data->cancellable);
 
   return NULL;
@@ -672,6 +655,70 @@ create_server (ServerData *data, GCancellable *cancellable)
 
   data->server_thread = g_thread_new ("server", echo_server_thread, data);
 }
+
+
+/******************************************************************/
+/* Now a GResolver implementation, so the can't-resolve test will */
+/* pass even if you have an evil DNS-faking ISP.                  */
+/******************************************************************/
+
+typedef GResolver GFakeResolver;
+typedef GResolverClass GFakeResolverClass;
+
+G_DEFINE_TYPE (GFakeResolver, g_fake_resolver, G_TYPE_RESOLVER)
+
+static void
+g_fake_resolver_init (GFakeResolver *gtr)
+{
+}
+
+static GList *
+g_fake_resolver_lookup_by_name (GResolver     *resolver,
+				const gchar   *hostname,
+				GCancellable  *cancellable,
+				GError       **error)
+{
+  /* This is only ever called with lookups that are expected to
+   * fail.
+   */
+  g_set_error (error,
+	       G_RESOLVER_ERROR,
+	       G_RESOLVER_ERROR_NOT_FOUND,
+	       "Not found");
+  return NULL;
+}
+
+static void
+g_fake_resolver_lookup_by_name_async (GResolver           *resolver,
+				      const gchar         *hostname,
+				      GCancellable        *cancellable,
+				      GAsyncReadyCallback  callback,
+				      gpointer             user_data)
+{
+  g_task_report_new_error (resolver, callback, user_data,
+			   g_fake_resolver_lookup_by_name_async,
+			   G_RESOLVER_ERROR, G_RESOLVER_ERROR_NOT_FOUND,
+			   "Not found");
+}
+
+static GList *
+g_fake_resolver_lookup_by_name_finish (GResolver            *resolver,
+				       GAsyncResult         *result,
+				       GError              **error)
+{
+  return g_task_propagate_pointer (G_TASK (result), error);
+}
+
+static void
+g_fake_resolver_class_init (GFakeResolverClass *fake_class)
+{
+  GResolverClass *resolver_class = G_RESOLVER_CLASS (fake_class);
+
+  resolver_class->lookup_by_name        = g_fake_resolver_lookup_by_name;
+  resolver_class->lookup_by_name_async  = g_fake_resolver_lookup_by_name_async;
+  resolver_class->lookup_by_name_finish = g_fake_resolver_lookup_by_name_finish;
+}
+
 
 
 /****************************************/
@@ -770,6 +817,13 @@ assert_direct (GSocketConnection *conn)
   addr = g_socket_connection_get_remote_address (conn, &error);
   g_assert_no_error (error);
   g_assert (!G_IS_PROXY_ADDRESS (addr));
+  g_object_unref (addr);
+
+  addr = g_socket_connection_get_local_address (conn, &error);
+  g_assert_no_error (error);
+  g_object_unref (addr);
+
+  g_assert (g_socket_connection_is_connected (conn));
 }
 
 static void
@@ -834,6 +888,8 @@ assert_single (GSocketConnection *conn)
   g_assert_cmpstr (proxy_uri, ==, proxy_a.uri);
   proxy_port = g_inet_socket_address_get_port (G_INET_SOCKET_ADDRESS (addr));
   g_assert_cmpint (proxy_port, ==, proxy_a.port);
+
+  g_object_unref (addr);
 }
 
 static void
@@ -898,6 +954,8 @@ assert_multiple (GSocketConnection *conn)
   g_assert_cmpstr (proxy_uri, ==, proxy_b.uri);
   proxy_port = g_inet_socket_address_get_port (G_INET_SOCKET_ADDRESS (addr));
   g_assert_cmpint (proxy_port, ==, proxy_b.port);
+
+  g_object_unref (addr);
 }
 
 static void
@@ -1008,21 +1066,25 @@ test_dns (gpointer fixture,
   uri = g_strdup_printf ("beta://no-such-host.xx:%u", server.server_port);
   conn = g_socket_client_connect_to_uri (client, uri, 0, NULL, &error);
   g_assert_no_error (error);
-  g_clear_object (&conn);
 
   g_assert_no_error (proxy_a.last_error);
   g_assert_no_error (proxy_b.last_error);
+
+  do_echo_test (conn);
+  g_clear_object (&conn);
   teardown_test (NULL, NULL);
 
   g_socket_client_connect_to_uri_async (client, uri, 0, NULL,
 					async_got_conn, &conn);
   while (conn == NULL)
     g_main_context_iteration (NULL, TRUE);
-  g_clear_object (&conn);
   g_free (uri);
 
   g_assert_no_error (proxy_a.last_error);
   g_assert_no_error (proxy_b.last_error);
+
+  do_echo_test (conn);
+  g_clear_object (&conn);
   teardown_test (NULL, NULL);
 }
 
@@ -1030,10 +1092,10 @@ int
 main (int   argc,
       char *argv[])
 {
+  GResolver *fake_resolver;
   GCancellable *cancellable;
   gint result;
 
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
 
   /* Register stuff. The dummy g_proxy_get_default_for_protocol() call
@@ -1046,6 +1108,9 @@ main (int   argc,
   g_proxy_a_get_type ();
   g_proxy_b_get_type ();
   g_setenv ("GIO_USE_PROXY_RESOLVER", "test", TRUE);
+
+  fake_resolver = g_object_new (g_fake_resolver_get_type (), NULL);
+  g_resolver_set_default (fake_resolver);
 
   cancellable = g_cancellable_new ();
   create_server (&server, cancellable);
@@ -1071,6 +1136,8 @@ main (int   argc,
   g_thread_join (proxy_a.thread);
   g_thread_join (proxy_b.thread);
   g_thread_join (server.server_thread);
+
+  g_object_unref (cancellable);
 
   return result;
 }

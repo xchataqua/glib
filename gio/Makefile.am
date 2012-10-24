@@ -260,6 +260,8 @@ unix_sources = \
 	gunixvolumemonitor.h 	\
 	gunixinputstream.c 	\
 	gunixoutputstream.c 	\
+	gcontenttype.c 		\
+	gcontenttypeprivate.h 	\
 	$(NULL)
 
 
@@ -294,6 +296,7 @@ gdbus_daemon_sources = \
 
 win32_actual_sources = \
 	$(gdbus_daemon_sources) \
+	gcontenttype-win32.c \
 	gwin32mount.c \
 	gwin32mount.h \
 	gwin32volumemonitor.c \
@@ -338,8 +341,6 @@ libgio_2_0_la_SOURCES =		\
 	gbufferedinputstream.c 	\
 	gbufferedoutputstream.c \
 	gcancellable.c 		\
-	gcontenttype.c 		\
-	gcontenttypeprivate.h 	\
 	gcharsetconverter.c	\
 	gconverter.c		\
 	gconverterinputstream.c	\
@@ -429,6 +430,7 @@ libgio_2_0_la_SOURCES =		\
 	gproxyaddressenumerator.c \
 	gsocketservice.c	\
 	gsrvtarget.c		\
+	gtask.c			\
 	gtcpconnection.c	\
 	gtcpwrapperconnection.c \
 	gthreadedsocketservice.c\
@@ -515,7 +517,7 @@ libgio_2_0_la_LDFLAGS = $(GLIB_LINK_FLAGS) \
 if OS_COCOA
 # This is dumb.  The ObjC source file should be properly named .m
 libgio_2_0_la_CFLAGS = -xobjective-c
-libgio_2_0_la_LDFLAGS += -framework Foundation
+libgio_2_0_la_LDFLAGS += -Wl,-framework,Foundation
 endif
 
 libgio_2_0_la_DEPENDENCIES = $(gio_win32_res) $(gio_def) $(platform_deps)
@@ -598,6 +600,7 @@ gio_headers =			\
 	gsocketlistener.h	\
 	gsocketservice.h	\
 	gsrvtarget.h		\
+	gtask.h			\
 	gtcpconnection.h	\
 	gtcpwrapperconnection.h \
 	gthreadedsocketservice.h\
@@ -652,7 +655,7 @@ BUILT_EXTRA_DIST = 		\
 
 # This is read by gobject-introspection/misc/ and gtk-doc
 gio-public-headers.txt: Makefile
-	echo $(gioinclude_HEADERS) $(giowin32include_HEADERS) $(giounixinclude_HEADERS) > $@.tmp && mv $@.tmp $@
+	$(AM_V_GEN) echo $(gioinclude_HEADERS) $(giowin32include_HEADERS) $(giounixinclude_HEADERS) > $@.tmp && mv $@.tmp $@
 
 CLEANFILES = gdbus-daemon-generated.c gdbus-daemon-generated.h gio-public-headers.txt gconstructor_as_data.h
 
@@ -721,11 +724,11 @@ gdbus_LDADD = libgio-2.0.la \
 	$(top_builddir)/glib/libglib-2.0.la 		\
 	$(top_builddir)/gobject/libgobject-2.0.la
 
-completiondir = $(sysconfdir)/bash_completion.d
+completiondir = $(datadir)/bash-completion/completions
 completion_DATA = \
-	gdbus-bash-completion.sh		\
-	gsettings-bash-completion.sh		\
-	gresource-bash-completion.sh
+	completion/gdbus				\
+	completion/gsettings				\
+	completion/gresource
 EXTRA_DIST += $(completion_DATA)
 
 # ------------------------------------------------------------------------
@@ -750,7 +753,7 @@ dist-hook: $(BUILT_EXTRA_DIST) ../build/win32/vs9/gio.vcproj ../build/win32/vs10
 ../build/win32/vs9/gio.vcproj: $(top_srcdir)/build/win32/vs9/gio.vcprojin
 	for F in `echo $(libgio_2_0_la_SOURCES) $(win32_actual_sources) $(win32_more_sources_for_vcproj) | tr '/' '\\'`; do \
 		case $$F in \
-		gunix*.c|gdesktopappinfo.c|gnetworkmonitornetlink.c) ;; \
+		gunix*.c|gdesktopappinfo.c|gnetworkmonitornetlink.c|gcontenttype.c) ;; \
 		*.c) echo '   <File RelativePath="..\..\..\gio\'$$F'" />' \
 		     ;; \
 		esac; \
@@ -761,7 +764,7 @@ dist-hook: $(BUILT_EXTRA_DIST) ../build/win32/vs9/gio.vcproj ../build/win32/vs10
 ../build/win32/vs10/gio.vcxproj: $(top_srcdir)/build/win32/vs10/gio.vcxprojin
 	for F in `echo $(libgio_2_0_la_SOURCES) $(win32_actual_sources) $(win32_more_sources_for_vcproj) | tr '/' '\\'`; do \
 		case $$F in \
-		gunix*.c|gdesktopappinfo.c|gnetworkmonitornetlink.c) ;; \
+		gunix*.c|gdesktopappinfo.c|gnetworkmonitornetlink.c|gcontenttype.c) ;; \
 		*.c) echo '    <ClCompile Include="..\..\..\gio\'$$F'" />' \
 		     ;; \
 		esac; \
@@ -772,7 +775,7 @@ dist-hook: $(BUILT_EXTRA_DIST) ../build/win32/vs9/gio.vcproj ../build/win32/vs10
 ../build/win32/vs10/gio.vcxproj.filters: $(top_srcdir)/build/win32/vs10/gio.vcxproj.filtersin
 	for F in `echo $(libgio_2_0_la_SOURCES) $(win32_actual_sources) $(win32_more_sources_for_vcproj) | tr '/' '\\'`; do \
 		case $$F in \
-		gunix*.c|gdesktopappinfo.c|gnetworkmonitornetlink.c) ;; \
+		gunix*.c|gdesktopappinfo.c|gnetworkmonitornetlink.c|gcontenttype.c) ;; \
 		*.c) echo '    <ClCompile Include="..\..\..\gio\'$$F'"><Filter>Source Files</Filter></ClCompile>' \
 		     ;; \
 		esac; \

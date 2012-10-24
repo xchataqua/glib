@@ -127,6 +127,8 @@ g_file_set_display_name
 g_file_set_display_name_async
 g_file_set_display_name_finish
 g_file_delete
+g_file_delete_async
+g_file_delete_finish
 g_file_trash
 g_file_copy
 g_file_copy_async
@@ -239,6 +241,7 @@ G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME
 G_FILE_ATTRIBUTE_STANDARD_EDIT_NAME
 G_FILE_ATTRIBUTE_STANDARD_COPY_NAME
 G_FILE_ATTRIBUTE_STANDARD_ICON
+G_FILE_ATTRIBUTE_STANDARD_SYMBOLIC_ICON
 G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE
 G_FILE_ATTRIBUTE_STANDARD_FAST_CONTENT_TYPE
 G_FILE_ATTRIBUTE_STANDARD_SIZE
@@ -345,6 +348,7 @@ g_file_info_get_name
 g_file_info_get_display_name
 g_file_info_get_edit_name
 g_file_info_get_icon
+g_file_info_get_symbolic_icon
 g_file_info_get_content_type
 g_file_info_get_size
 g_file_info_get_modification_time
@@ -360,6 +364,7 @@ g_file_info_set_name
 g_file_info_set_display_name
 g_file_info_set_edit_name
 g_file_info_set_icon
+g_file_info_set_symbolic_icon
 g_file_info_set_content_type
 g_file_info_set_size
 g_file_info_set_modification_time
@@ -562,6 +567,9 @@ g_input_stream_is_closed
 g_input_stream_has_pending
 g_input_stream_set_pending
 g_input_stream_clear_pending
+g_input_stream_read_bytes
+g_input_stream_read_bytes_async
+g_input_stream_read_bytes_finish
 <SUBSECTION Standard>
 GInputStreamClass
 G_INPUT_STREAM
@@ -769,6 +777,9 @@ g_output_stream_is_closed
 g_output_stream_has_pending
 g_output_stream_set_pending
 g_output_stream_clear_pending
+g_output_stream_write_bytes
+g_output_stream_write_bytes_async
+g_output_stream_write_bytes_finish
 <SUBSECTION Standard>
 GOutputStreamClass
 G_OUTPUT_STREAM
@@ -1039,6 +1050,7 @@ GMountIface
 g_mount_get_name
 g_mount_get_uuid
 g_mount_get_icon
+g_mount_get_symbolic_icon
 g_mount_get_drive
 g_mount_get_root
 g_mount_get_volume
@@ -1081,6 +1093,7 @@ GVolumeIface
 g_volume_get_name
 g_volume_get_uuid
 g_volume_get_icon
+g_volume_get_symbolic_icon
 g_volume_get_drive
 g_volume_get_mount
 g_volume_can_mount
@@ -1120,6 +1133,7 @@ GDriveStartFlags
 GDriveStartStopType
 g_drive_get_name
 g_drive_get_icon
+g_drive_get_symbolic_icon
 g_drive_has_volumes
 g_drive_get_volumes
 g_drive_can_eject
@@ -1193,6 +1207,8 @@ GAsyncResultIface
 GAsyncReadyCallback
 g_async_result_get_user_data
 g_async_result_get_source_object
+g_async_result_is_tagged
+g_async_result_legacy_propagate_error
 <SUBSECTION Standard>
 G_ASYNC_RESULT
 G_IS_ASYNC_RESULT
@@ -1275,6 +1291,8 @@ g_content_type_is_unknown
 g_content_type_get_description
 g_content_type_get_mime_type
 g_content_type_get_icon
+g_content_type_get_symbolic_icon
+g_content_type_get_generic_icon_name
 g_content_type_can_be_executable
 g_content_type_from_mime_type
 g_content_type_guess
@@ -1313,6 +1331,7 @@ g_app_info_set_as_last_used_for_type
 g_app_info_add_supports_type
 g_app_info_can_remove_supports_type
 g_app_info_remove_supports_type
+g_app_info_get_supported_types
 g_app_info_get_all
 g_app_info_get_all_for_type
 g_app_info_get_default_for_type
@@ -1415,6 +1434,7 @@ g_unix_mount_get_fs_type
 g_unix_mount_is_readonly
 g_unix_mount_is_system_internal
 g_unix_mount_guess_icon
+g_unix_mount_guess_symbolic_icon
 g_unix_mount_guess_name
 g_unix_mount_guess_can_eject
 g_unix_mount_guess_should_display
@@ -1428,6 +1448,7 @@ g_unix_mount_point_is_readonly
 g_unix_mount_point_is_user_mountable
 g_unix_mount_point_is_loopback
 g_unix_mount_point_guess_icon
+g_unix_mount_point_guess_symbolic_icon
 g_unix_mount_point_guess_name
 g_unix_mount_point_guess_can_eject
 g_unix_mount_points_get
@@ -2622,6 +2643,7 @@ g_dbus_connection_get_unique_name
 GDBusCapabilityFlags
 g_dbus_connection_get_capabilities
 g_dbus_connection_get_peer_credentials
+g_dbus_connection_get_last_serial
 GDBusCallFlags
 g_dbus_connection_call
 g_dbus_connection_call_finish
@@ -2896,6 +2918,9 @@ g_application_set_inactivity_timeout
 <SUBSECTION>
 g_application_get_flags
 g_application_set_flags
+<SUBSECTION>
+g_application_get_dbus_connection
+g_application_get_dbus_object_path
 <SUBSECTION>
 g_application_set_action_group
 <SUBSECTION>
@@ -3285,6 +3310,7 @@ g_tls_certificate_new_from_files
 g_tls_certificate_list_new_from_file
 g_tls_certificate_get_issuer
 g_tls_certificate_verify
+g_tls_certificate_is_same
 <SUBSECTION Standard>
 GTlsCertificateClass
 GTlsCertificatePrivate
@@ -3641,6 +3667,7 @@ g_dbus_object_manager_server_get_connection
 g_dbus_object_manager_server_set_connection
 g_dbus_object_manager_server_export
 g_dbus_object_manager_server_export_uniquely
+g_dbus_object_manager_server_is_exported
 g_dbus_object_manager_server_unexport
 <SUBSECTION Standard>
 G_DBUS_OBJECT_MANAGER_SERVER
@@ -3727,6 +3754,7 @@ GMenuItem
 g_menu_item_new
 g_menu_item_new_section
 g_menu_item_new_submenu
+g_menu_item_new_from_model
 
 <SUBSECTION>
 g_menu_item_set_label
@@ -3737,6 +3765,9 @@ g_menu_item_set_section
 g_menu_item_set_submenu
 
 <SUBSECTION>
+g_menu_item_get_attribute_value
+g_menu_item_get_attribute
+g_menu_item_get_link
 g_menu_item_set_attribute_value
 g_menu_item_set_attribute
 g_menu_item_set_link
@@ -3889,4 +3920,57 @@ g_test_dbus_unset
 <SUBSECTION Private>
 g_test_dbus_get_type
 g_test_dbus_flags_get_type
+</SECTION>
+
+<SECTION>
+<FILE>gtask</FILE>
+<TITLE>GTask</TITLE>
+GTask
+g_task_new
+g_task_set_task_data
+g_task_set_priority
+g_task_set_check_cancellable
+g_task_set_return_on_cancel
+g_task_set_source_tag
+<SUBSECTION>
+g_task_report_error
+g_task_report_new_error
+<SUBSECTION>
+g_task_get_task_data
+g_task_get_priority
+g_task_get_cancellable
+g_task_get_check_cancellable
+g_task_get_return_on_cancel
+g_task_get_context
+g_task_get_source_object
+g_task_get_source_tag
+<SUBSECTION>
+g_task_return_boolean
+g_task_return_int
+g_task_return_pointer
+g_task_return_error
+g_task_return_new_error
+g_task_return_error_if_cancelled
+<SUBSECTION>
+g_task_propagate_boolean
+g_task_propagate_int
+g_task_propagate_pointer
+g_task_had_error
+<SUBSECTION>
+g_task_run_in_thread
+g_task_run_in_thread_sync
+GTaskThreadFunc
+g_task_attach_source
+<SUBSECTION>
+g_task_is_valid
+<SUBSECTION Standard>
+GTaskClass
+GTaskPrivate
+G_TYPE_TASK
+G_TASK
+G_IS_TASK
+G_TASK_CLASS
+G_IS_TASK_CLASS
+G_TASK_GET_CLASS
+g_task_get_type
 </SECTION>

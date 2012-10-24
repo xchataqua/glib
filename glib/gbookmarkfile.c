@@ -1585,15 +1585,7 @@ timestamp_from_iso8601 (const gchar *iso_date)
   return (time_t) stamp.tv_sec;
 }
 
-
-
-GQuark
-g_bookmark_file_error_quark (void)
-{
-  return g_quark_from_static_string ("g-bookmark-file-error-quark");
-}
-
-
+G_DEFINE_QUARK (g-bookmark-file-error-quark, g_bookmark_file_error)
 
 /********************
  *    Public API    *
@@ -3234,6 +3226,9 @@ g_bookmark_file_set_app_info (GBookmarkFile  *bookmark,
 	}
     }
   
+  if (!item->metadata)
+    item->metadata = bookmark_metadata_new ();
+
   ai = bookmark_item_lookup_app_info (item, name);
   if (!ai)
     {

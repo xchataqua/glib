@@ -359,18 +359,20 @@ g_unix_connection_send_credentials (GUnixConnection      *connection,
 }
 
 static void
-send_credentials_async_thread (GSimpleAsyncResult *result,
-                               GObject            *object,
-                               GCancellable       *cancellable)
+send_credentials_async_thread (GTask         *task,
+			       gpointer       source_object,
+			       gpointer       task_data,
+			       GCancellable  *cancellable)
 {
   GError *error = NULL;
 
-  if (!g_unix_connection_send_credentials (G_UNIX_CONNECTION (object),
-                                           cancellable,
-                                           &error))
-    {
-      g_simple_async_result_take_error (result, error);
-    }
+  if (g_unix_connection_send_credentials (G_UNIX_CONNECTION (source_object),
+					  cancellable,
+					  &error))
+    g_task_return_boolean (task, TRUE);
+  else
+    g_task_return_error (task, error);
+  g_object_unref (task);
 }
 
 /**
@@ -396,17 +398,11 @@ g_unix_connection_send_credentials_async (GUnixConnection      *connection,
                                           GAsyncReadyCallback   callback,
                                           gpointer              user_data)
 {
-  GSimpleAsyncResult *result;
+  GTask *task;
 
-  result = g_simple_async_result_new (G_OBJECT (connection),
-                                      callback, user_data,
-                                      g_unix_connection_send_credentials_async);
+  task = g_task_new (connection, cancellable, callback, user_data);
 
-  g_simple_async_result_run_in_thread (result,
-                                       send_credentials_async_thread,
-                                       G_PRIORITY_DEFAULT,
-                                       cancellable);
-  g_object_unref (result);
+  g_task_run_in_thread (task, send_credentials_async_thread);
 }
 
 /**
@@ -427,18 +423,9 @@ g_unix_connection_send_credentials_finish (GUnixConnection *connection,
                                            GAsyncResult    *result,
                                            GError         **error)
 {
-  g_return_val_if_fail (
-      g_simple_async_result_is_valid (result,
-                                      G_OBJECT (connection),
-                                      g_unix_connection_send_credentials_async),
-      FALSE);
+  g_return_val_if_fail (g_task_is_valid (result, connection), FALSE);
 
-  if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
-                                             error))
-    return FALSE;
-
-
-  return TRUE;
+  return g_task_propagate_boolean (G_TASK (result), error);
 }
 
 /**
@@ -473,7 +460,6 @@ g_unix_connection_receive_credentials (GUnixConnection      *connection,
   gint nscm;
   GSocket *socket;
   gint n;
-  volatile GType credentials_message_gtype;
   gssize num_bytes_read;
 #ifdef __linux__
   gboolean turn_off_so_passcreds;
@@ -543,9 +529,7 @@ g_unix_connection_receive_credentials (GUnixConnection      *connection,
   }
 #endif
 
-  /* ensure the type of GUnixCredentialsMessage has been registered with the type system */
-  credentials_message_gtype = G_TYPE_UNIX_CREDENTIALS_MESSAGE;
-  (credentials_message_gtype); /* To avoid -Wunused-but-set-variable */
+  g_type_ensure (G_TYPE_UNIX_CREDENTIALS_MESSAGE);
   num_bytes_read = g_socket_receive_message (socket,
                                              NULL, /* GSocketAddress **address */
                                              NULL,
@@ -647,21 +631,22 @@ g_unix_connection_receive_credentials (GUnixConnection      *connection,
 }
 
 static void
-receive_credentials_async_thread (GSimpleAsyncResult *result,
-                                  GObject            *object,
-                                  GCancellable       *cancellable)
+receive_credentials_async_thread (GTask         *task,
+				  gpointer       source_object,
+				  gpointer       task_data,
+				  GCancellable  *cancellable)
 {
   GCredentials *creds;
   GError *error = NULL;
 
-  creds = g_unix_connection_receive_credentials (G_UNIX_CONNECTION (object),
+  creds = g_unix_connection_receive_credentials (G_UNIX_CONNECTION (source_object),
                                                  cancellable,
                                                  &error);
-
-  if (creds == NULL)
-    g_simple_async_result_take_error (result, error);
+  if (creds)
+    g_task_return_pointer (task, creds, g_object_unref);
   else
-    g_simple_async_result_set_op_res_gpointer (result, creds, g_object_unref);
+    g_task_return_error (task, error);
+  g_object_unref (task);
 }
 
 /**
@@ -687,18 +672,11 @@ g_unix_connection_receive_credentials_async (GUnixConnection      *connection,
                                               GAsyncReadyCallback   callback,
                                               gpointer              user_data)
 {
-  GSimpleAsyncResult *result;
+  GTask *task;
 
-  result = g_simple_async_result_new (G_OBJECT (connection),
-                                      callback, user_data,
-                                      g_unix_connection_receive_credentials_async);
+  task = g_task_new (connection, cancellable, callback, user_data);
 
-  g_simple_async_result_run_in_thread (result,
-                                       receive_credentials_async_thread,
-                                       G_PRIORITY_DEFAULT,
-                                       cancellable);
-
-  g_object_unref (result);
+  g_task_run_in_thread (task, receive_credentials_async_thread);
 }
 
 /**
@@ -720,16 +698,7 @@ g_unix_connection_receive_credentials_finish (GUnixConnection *connection,
                                               GAsyncResult    *result,
                                               GError         **error)
 {
-  g_return_val_if_fail (
-      g_simple_async_result_is_valid (result,
-                                      G_OBJECT (connection),
-                                      g_unix_connection_receive_credentials_async),
-      NULL);
+  g_return_val_if_fail (g_task_is_valid (result, connection), NULL);
 
-  if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
-                                             error))
-    return NULL;
-
-  return g_object_ref (g_simple_async_result_get_op_res_gpointer (
-      G_SIMPLE_ASYNC_RESULT (result)));
+  return g_task_propagate_pointer (G_TASK (result), error);
 }

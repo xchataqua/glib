@@ -97,6 +97,14 @@ typedef enum
 } GSpawnError;
 
 /**
+ * G_SPAWN_EXIT_ERROR:
+ *
+ * Error domain used by g_spawn_check_exit_status().  The code
+ * will be the program exit code.
+ */
+#define G_SPAWN_EXIT_ERROR g_spawn_exit_error_quark ()
+
+/**
  * GSpawnChildSetupFunc:
  * @user_data: user data to pass to the function.
  *
@@ -155,6 +163,9 @@ typedef void (* GSpawnChildSetupFunc) (gpointer user_data);
  *   vector to pass to the file. Normally g_spawn_async_with_pipes() uses
  *   <literal>argv[0]</literal> as the file to execute, and passes all of
  *   <literal>argv</literal> to the child.
+ * @G_SPAWN_SEARCH_PATH_FROM_ENVP: if <literal>argv[0]</literal> is not an abolute path,
+ *   it will be looked for in the <envar>PATH</envar> from the passed child 
+ *   environment. Since: 2.34
  *
  * Flags passed to g_spawn_sync(), g_spawn_async() and g_spawn_async_with_pipes().
  */
@@ -168,10 +179,12 @@ typedef enum
   G_SPAWN_STDOUT_TO_DEV_NULL     = 1 << 3,
   G_SPAWN_STDERR_TO_DEV_NULL     = 1 << 4,
   G_SPAWN_CHILD_INHERITS_STDIN   = 1 << 5,
-  G_SPAWN_FILE_AND_ARGV_ZERO     = 1 << 6
+  G_SPAWN_FILE_AND_ARGV_ZERO     = 1 << 6,
+  G_SPAWN_SEARCH_PATH_FROM_ENVP  = 1 << 7
 } GSpawnFlags;
 
 GQuark g_spawn_error_quark (void);
+GQuark g_spawn_exit_error_quark (void);
 
 #ifndef __GTK_DOC_IGNORE__
 #ifdef G_OS_WIN32
@@ -231,6 +244,10 @@ gboolean g_spawn_command_line_sync  (const gchar          *command_line,
                                      GError              **error);
 gboolean g_spawn_command_line_async (const gchar          *command_line,
                                      GError              **error);
+
+GLIB_AVAILABLE_IN_2_34
+gboolean g_spawn_check_exit_status (gint      exit_status,
+				    GError  **error);
 
 void g_spawn_close_pid (GPid pid);
 

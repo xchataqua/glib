@@ -26,7 +26,13 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <gstdio.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#ifdef G_OS_WIN32
+#include <io.h>
+#endif
 
 #include <glib.h>
 
@@ -311,7 +317,8 @@ _g_test_watcher_remove_pid (GPid pid)
  * @short_description: D-Bus testing helper
  * @include: gio/gio.h
  *
- * Helper to test D-Bus code wihtout messing up with user' session bus.
+ * A helper class for testing code which uses D-Bus without touching the user's
+ * session bus.
  */
 
 typedef struct _GTestDBusClass   GTestDBusClass;
@@ -450,18 +457,17 @@ g_test_dbus_class_init (GTestDBusClass *klass)
 
 }
 
-static GFile *
+static gchar *
 write_config_file (GTestDBus *self)
 {
   GString *contents;
-  GFile *file;
-  GFileIOStream *iostream;
+  gint fd;
   guint i;
   GError *error = NULL;
+  gchar *path = NULL;
 
-  file = g_file_new_tmp ("g-test-dbus-XXXXXX", &iostream, &error);
+  fd = g_file_open_tmp ("g-test-dbus-XXXXXX", &path, &error);
   g_assert_no_error (error);
-  g_object_unref (iostream);
 
   contents = g_string_new (NULL);
   g_string_append (contents,
@@ -493,20 +499,20 @@ write_config_file (GTestDBus *self)
       "  </policy>\n"
       "</busconfig>\n");
 
-  g_file_replace_contents (file, contents->str, contents->len,
-      NULL, FALSE, G_FILE_CREATE_NONE, NULL, NULL, &error);
+  g_file_set_contents (path, contents->str, contents->len, &error);
   g_assert_no_error (error);
 
   g_string_free (contents, TRUE);
 
-  return file;
+  close (fd);
+
+  return path;
 }
 
 static void
 start_daemon (GTestDBus *self)
 {
   gchar *argv[] = {"dbus-daemon", "--print-address", "--config-file=foo", NULL};
-  GFile *file;
   gchar *config_path;
   gchar *config_arg;
   gint stdout_fd;
@@ -515,11 +521,10 @@ start_daemon (GTestDBus *self)
   GError *error = NULL;
 
   if (g_getenv ("G_TEST_DBUS_DAEMON") != NULL)
-    argv[0] = g_getenv ("G_TEST_DBUS_DAEMON");
+    argv[0] = (gchar *)g_getenv ("G_TEST_DBUS_DAEMON");
 
   /* Write config file and set its path in argv */
-  file = write_config_file (self);
-  config_path = g_file_get_path (file);
+  config_path = write_config_file (self);
   config_arg = g_strdup_printf ("--config-file=%s", config_path);
   argv[2] = config_arg;
 
@@ -560,7 +565,7 @@ start_daemon (GTestDBus *self)
       g_spawn_command_line_async (command, NULL);
       g_free (command);
 
-      usleep (500 * 1000);
+      g_usleep (500 * 1000);
     }
 
   /* Cleanup */
@@ -568,9 +573,9 @@ start_daemon (GTestDBus *self)
   g_assert_no_error (error);
   g_io_channel_unref (channel);
 
-  g_file_delete (file, NULL, &error);
-  g_assert_no_error (error);
-  g_object_unref (file);
+  /* Don't use g_file_delete since it calls into gvfs */
+  if (g_unlink (config_path) != 0)
+    g_assert_not_reached ();
 
   g_free (config_path);
   g_free (config_arg);
@@ -612,6 +617,8 @@ g_test_dbus_new (GTestDBusFlags flags)
 /**
  * g_test_dbus_get_flags:
  * @self: a #GTestDBus
+ *
+ * Gets the flags of the #GTestDBus object.
  *
  * Returns: the value of #GTestDBus:flags property
  */
@@ -664,7 +671,7 @@ g_test_dbus_add_service_dir (GTestDBus *self,
  * @self: a #GTestDBus
  *
  * Start a dbus-daemon instance and set DBUS_SESSION_BUS_ADDRESS. After this
- * call, it is safe for unit tests to start sending messages on the session bug.
+ * call, it is safe for unit tests to start sending messages on the session bus.
  *
  * If this function is called from setup callback of g_test_add(),
  * g_test_dbus_down() must be called in its teardown callback.

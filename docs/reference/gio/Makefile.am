@@ -142,7 +142,11 @@ include $(top_srcdir)/gtk-doc.make
 EXTRA_DIST +=			\
 	version.xml.in
 
-man_MANS =			\
+man_MANS =
+
+if ENABLE_MAN
+
+man_MANS +=			\
 	gio-querymodules.1	\
 	glib-compile-schemas.1	\
 	glib-compile-resources.1	\
@@ -151,31 +155,25 @@ man_MANS =			\
 	gdbus.1			\
 	gdbus-codegen.1
 
-if ENABLE_MAN
+XSLTPROC_FLAGS = \
+        --nonet \
+        --stringparam man.output.quietly 1 \
+        --stringparam funcsynopsis.style ansi \
+        --stringparam man.th.extra1.suppress 1 \
+        --stringparam man.authors.section.enabled 0 \
+        --stringparam man.copyright.section.enabled 0
 
 .xml.1:
-	@XSLTPROC@ -nonet http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl $<
-
-dist-local-check-mans-enabled:
-	if grep "Man generation disabled" $(man_MANS) >/dev/null; then $(RM) $(man_MANS); fi
-
-else
-
-$(man_MANS):
-	echo Man generation disabled.  Creating dummy $@.  Configure with --enable-man to enable it.
-	echo Man generation disabled.  Remove this file, configure with --enable-man, and rebuild > $@
-
-dist-local-check-mans-enabled:
-	echo "*** --enable-man must be used in order to make dist"
-	false
+	$(AM_V_GEN) $(XSLTPROC) $(XSLTPROC_FLAGS) http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl $<
 
 endif
 
-MAINTAINERCLEANFILES = $(man_MANS) $(BUILT_SOURCES)
+CLEANFILES ?=
+CLEANFILES += $(man_MANS)
 
 EXTRA_DIST += $(man_MANS)
 
-dist-hook-local: dist-local-check-mans-enabled all-local
+dist-hook-local: all-local
 
 gio-docs-clean: clean
 	cd $(srcdir) && rm -rf xml html

@@ -542,21 +542,17 @@ g_buffered_input_stream_fill_finish (GBufferedInputStream  *stream,
                                      GAsyncResult          *result,
                                      GError               **error)
 {
-  GSimpleAsyncResult *simple;
   GBufferedInputStreamClass *class;
 
   g_return_val_if_fail (G_IS_BUFFERED_INPUT_STREAM (stream), -1);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (result), -1);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (result))
+  if (g_async_result_legacy_propagate_error (result, error))
+    return -1;
+  else if (g_async_result_is_tagged (result, g_buffered_input_stream_fill_async))
     {
-      simple = G_SIMPLE_ASYNC_RESULT (result);
-      if (g_simple_async_result_propagate_error (simple, error))
-        return -1;
-
       /* Special case read of 0 bytes */
-      if (g_simple_async_result_get_source_tag (simple) == g_buffered_input_stream_fill_async)
-        return 0;
+      return 0;
     }
 
   class = G_BUFFERED_INPUT_STREAM_GET_CLASS (stream);
@@ -1130,6 +1126,9 @@ g_buffered_input_stream_real_fill_finish (GBufferedInputStream *stream,
 
   simple = G_SIMPLE_ASYNC_RESULT (result);
   g_warn_if_fail (g_simple_async_result_get_source_tag (simple) == g_buffered_input_stream_real_fill_async);
+
+  if (g_simple_async_result_propagate_error (simple, error))
+    return -1;
 
   nread = g_simple_async_result_get_op_res_gssize (simple);
   return nread;

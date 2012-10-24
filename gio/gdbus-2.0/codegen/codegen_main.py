@@ -56,6 +56,7 @@ def find_prop(iface, prop):
     return None
 
 def apply_annotation(iface_list, iface, method, signal, prop, arg, key, value):
+    iface_obj = None
     for i in iface_list:
         if i.name == iface:
             iface_obj = i
@@ -184,8 +185,8 @@ def codegen_main():
 
     c_code = opts.generate_c_code
     if c_code:
-        h = file(c_code + '.h', 'w')
-        c = file(c_code + '.c', 'w')
+        h = open(c_code + '.h', 'w')
+        c = open(c_code + '.c', 'w')
         gen = codegen.CodeGenerator(all_ifaces,
                                     opts.c_namespace,
                                     opts.interface_prefix,
@@ -193,6 +194,8 @@ def codegen_main():
                                     docbook_gen,
                                     h, c);
         ret = gen.generate()
+        h.close()
+        c.close()
 
     sys.exit(0)
 

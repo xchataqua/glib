@@ -350,7 +350,6 @@
   </interface>
 
   <!-- ChangingInterfaceV2:
-       @since: 2.0
   -->
   <interface name="ChangingInterfaceV2">
     <!--
@@ -374,7 +373,6 @@
   </interface>
 
   <!-- ChangingInterfaceV10:
-       @since: 10.0
   -->
   <interface name="ChangingInterfaceV10">
     <!--
@@ -473,6 +471,10 @@
       <arg name="greeting" direction="in" type="s"/>
       <arg name="response" direction="out" type="s"/>
     </method>
+  </interface>
+
+  <interface name="Naming">
+    <property name="Type" type="i" access="readwrite"/>
   </interface>
 
 </node>

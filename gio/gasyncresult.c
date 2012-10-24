@@ -22,6 +22,7 @@
 
 #include "config.h"
 #include "gasyncresult.h"
+#include "gsimpleasyncresult.h"
 #include "glibintl.h"
 
 
@@ -29,7 +30,7 @@
  * SECTION:gasyncresult
  * @short_description: Asynchronous Function Results
  * @include: gio/gio.h
- * @see_also: #GSimpleAsyncResult
+ * @see_also: #GTask
  *
  * Provides a base class for implementing asynchronous function results.
  *
@@ -102,6 +103,16 @@
  * The callback for an asynchronous operation is called only once, and is
  * always called, even in the case of a cancelled operation. On cancellation
  * the result is a %G_IO_ERROR_CANCELLED error.
+ *
+ * <para id="io-priority"><indexterm><primary>I/O
+ * priority</primary></indexterm> Many I/O-related asynchronous
+ * operations have a priority parameter, which is used in certain
+ * cases to determine the order in which operations are executed. They
+ * are <emphasis>not</emphasis> used to determine system-wide I/O
+ * scheduling. Priorities are integers, with lower numbers indicating
+ * higher priority. It is recommended to choose priorities between
+ * %G_PRIORITY_LOW and %G_PRIORITY_HIGH, with %G_PRIORITY_DEFAULT as a
+ * default. </para>
  **/
 
 typedef GAsyncResultIface GAsyncResultInterface;
@@ -151,4 +162,74 @@ g_async_result_get_source_object (GAsyncResult *res)
   iface = G_ASYNC_RESULT_GET_IFACE (res);
 
   return (* iface->get_source_object) (res);
+}
+
+/**
+ * g_async_result_legacy_propagate_error:
+ * @res: a #GAsyncResult
+ * @error: (out): a location to propagate the error to.
+ *
+ * If @res is a #GSimpleAsyncResult, this is equivalent to
+ * g_simple_async_result_propagate_error(). Otherwise it returns
+ * %FALSE.
+ *
+ * This can be used for legacy error handling in async
+ * <literal>_finish ()</literal> wrapper functions that traditionally
+ * handled #GSimpleAsyncResult error returns themselves rather than
+ * calling into the virtual method. This should not be used in new
+ * code; #GAsyncResult errors that are set by virtual methods should
+ * also be extracted by virtual methods, to enable subclasses to chain
+ * up correctly.
+ *
+ * Returns: %TRUE if @error is has been filled in with an error from
+ *   @res, %FALSE if not.
+ *
+ * Since: 2.34
+ **/
+gboolean
+g_async_result_legacy_propagate_error (GAsyncResult  *res,
+				       GError       **error)
+{
+  /* This doesn't use a vmethod, because it's only for code that used
+   * to use GSimpleAsyncResult. (But it's a GAsyncResult method so
+   * that callers don't need to worry about GSimpleAsyncResult
+   * deprecation warnings in the future.)
+   */
+
+  if (G_IS_SIMPLE_ASYNC_RESULT (res))
+    {
+      return g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (res),
+						    error);
+    }
+  else
+    return FALSE;
+}
+
+/**
+ * g_async_result_is_tagged:
+ * @res: a #GAsyncResult
+ * @source_tag: an application-defined tag
+ *
+ * Checks if @res has the given @source_tag (generally a function
+ * pointer indicating the function @res was created by).
+ *
+ * Returns: %TRUE if @res has the indicated @source_tag, %FALSE if
+ *   not.
+ *
+ * Since: 2.34
+ **/
+gboolean
+g_async_result_is_tagged (GAsyncResult  *res,
+			  gpointer       source_tag)
+{
+  GAsyncResultIface *iface;
+
+  g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
+
+  iface = G_ASYNC_RESULT_GET_IFACE (res);
+
+  if (!iface->is_tagged)
+    return FALSE;
+
+  return (* iface->is_tagged) (res, source_tag);
 }

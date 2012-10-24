@@ -1222,6 +1222,84 @@ test_strftime (void)
     }
 }
 
+static void
+test_find_interval (void)
+{
+  GTimeZone *tz;
+  GDateTime *dt;
+  gint64 u;
+  gint i1, i2;
+
+  tz = g_time_zone_new ("Canada/Eastern");
+  dt = g_date_time_new_utc (2010, 11, 7, 1, 30, 0);
+  u = g_date_time_to_unix (dt);
+
+  i1 = g_time_zone_find_interval (tz, G_TIME_TYPE_STANDARD, u);
+  i2 = g_time_zone_find_interval (tz, G_TIME_TYPE_DAYLIGHT, u);
+
+  g_assert_cmpint (i1, !=, i2);
+
+  g_date_time_unref (dt);
+
+  dt = g_date_time_new_utc (2010, 3, 14, 2, 0, 0);
+  u = g_date_time_to_unix (dt);
+
+  i1 = g_time_zone_find_interval (tz, G_TIME_TYPE_STANDARD, u);
+  g_assert_cmpint (i1, ==, -1);
+
+  g_date_time_unref (dt);
+  g_time_zone_unref (tz);
+}
+
+static void
+test_adjust_time (void)
+{
+  GTimeZone *tz;
+  GDateTime *dt;
+  gint64 u, u2;
+  gint i1, i2;
+
+  tz = g_time_zone_new ("Canada/Eastern");
+  dt = g_date_time_new_utc (2010, 11, 7, 1, 30, 0);
+  u = g_date_time_to_unix (dt);
+  u2 = u;
+
+  i1 = g_time_zone_find_interval (tz, G_TIME_TYPE_DAYLIGHT, u);
+  i2 = g_time_zone_adjust_time (tz, G_TIME_TYPE_DAYLIGHT, &u2);
+
+  g_assert_cmpint (i1, ==, i2);
+  g_assert (u == u2);
+
+  g_date_time_unref (dt);
+
+  dt = g_date_time_new_utc (2010, 3, 14, 2, 30, 0);
+  u2 = g_date_time_to_unix (dt);
+  g_date_time_unref (dt);
+
+  dt = g_date_time_new_utc (2010, 3, 14, 3, 0, 0);
+  u = g_date_time_to_unix (dt);
+  g_date_time_unref (dt);
+
+  i1 = g_time_zone_adjust_time (tz, G_TIME_TYPE_DAYLIGHT, &u2);
+  g_assert (u == u2);
+
+  g_time_zone_unref (tz);
+}
+
+static void
+test_no_header (void)
+{
+  GTimeZone *tz;
+
+  tz = g_time_zone_new ("blabla");
+
+  g_assert_cmpstr (g_time_zone_get_abbreviation (tz, 0), ==, "UTC");
+  g_assert_cmpint (g_time_zone_get_offset (tz, 0), ==, 0);
+  g_assert (!g_time_zone_is_dst (tz, 0));
+
+  g_time_zone_unref (tz);
+}
+
 gint
 main (gint   argc,
       gchar *argv[])
@@ -1271,6 +1349,9 @@ main (gint   argc,
   g_test_add_func ("/GDateTime/dst", test_GDateTime_dst);
   g_test_add_func ("/GDateTime/test_z", test_z);
   g_test_add_func ("/GDateTime/test-all-dates", test_all_dates);
+  g_test_add_func ("/GTimeZone/find-interval", test_find_interval);
+  g_test_add_func ("/GTimeZone/adjust-time", test_adjust_time);
+  g_test_add_func ("/GTimeZone/no-header", test_no_header);
 
   return g_test_run ();
 }

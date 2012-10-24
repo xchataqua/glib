@@ -7,7 +7,7 @@ include $(top_srcdir)/Makefile.decl
 SUBDIRS = gdbus-object-manager-example
 
 INCLUDES = 			\
-	-g 			\
+	-DG_LOG_DOMAIN=\"GLib-GIO\" \
 	$(gio_INCLUDES)		\
 	$(GLIB_DEBUG_FLAGS)	\
 	-I$(top_builddir)/gio	\
@@ -60,6 +60,9 @@ TEST_PROGS +=	 		\
 	fileattributematcher	\
 	resources		\
 	proxy-test		\
+	inet-address		\
+	permission		\
+	task			\
 	$(NULL)
 
 if HAVE_DBUS_DAEMON
@@ -120,6 +123,7 @@ SAMPLE_PROGS = 				\
 	gapplication-example-cmdline2	\
 	gapplication-example-cmdline3	\
 	gapplication-example-actions	\
+	gapplication-example-dbushooks	\
 	gdbus-daemon			\
 	$(NULL)
 
@@ -451,11 +455,23 @@ gapplication_example_cmdline3_LDADD   = $(progs_ldadd)
 gapplication_example_actions_SOURCES = gapplication-example-actions.c
 gapplication_example_actions_LDADD   = $(progs_ldadd)
 
+gapplication_example_dbushooks_SOURCES = gapplication-example-dbushooks.c
+gapplication_example_dbushooks_LDADD   = $(progs_ldadd)
+
 gmenumodel_SOURCES = gmenumodel.c gdbus-sessionbus.h gdbus-sessionbus.c
 gmenumodel_LDADD = $(progs_ldadd)
 
 proxy_test_SOURCES = proxy-test.c
 proxy_test_LDADD   = $(progs_ldadd)
+
+inet_address_SOURCES = inet-address.c
+inet_address_LDADD   = $(progs_ldadd)
+
+permission_SOURCES = permission.c
+permission_LDADD   = $(progs_ldadd)
+
+task_SOURCES = task.c
+task_LDADD   = $(progs_ldadd)
 
 schema_tests = \
 	schema-tests/array-default-not-in-choices.gschema.xml		\
@@ -611,16 +627,16 @@ else
 endif
 
 BUILT_SOURCES += test_resources.c test_resources2.c test_resources2.h
-test_resources.c: test2.gresource.xml Makefile $(shell $(glib_compile_resources) --generate-dependencies $(srcdir)/test2.gresource.xml)
+test_resources.c: test2.gresource.xml Makefile $(shell $(glib_compile_resources) --sourcedir=$(srcdir) --generate-dependencies $(srcdir)/test2.gresource.xml)
 	$(AM_V_GEN) $(glib_compile_resources) --target=$@ --sourcedir=$(srcdir) --generate-source --c-name _g_test1 $<
 
-test_resources2.h test_resources2.c: test3.gresource.xml Makefile $(shell $(glib_compile_resources) --generate-dependencies $(srcdir)/test3.gresource.xml)
+test_resources2.h test_resources2.c: test3.gresource.xml Makefile $(shell $(glib_compile_resources) --sourcedir=$(srcdir) --generate-dependencies $(srcdir)/test3.gresource.xml)
 	$(AM_V_GEN) $(glib_compile_resources) --target=$@ --sourcedir=$(srcdir) --generate --c-name _g_test2 --manual-register $<
 
-plugin_resources.c: test4.gresource.xml Makefile $(shell $(glib_compile_resources) --generate-dependencies $(srcdir)/test4.gresource.xml)
+plugin_resources.c: test4.gresource.xml Makefile $(shell $(glib_compile_resources) --sourcedir=$(srcdir) --generate-dependencies $(srcdir)/test4.gresource.xml)
 	$(AM_V_GEN) $(glib_compile_resources) --target=$@ --sourcedir=$(srcdir) --generate-source --c-name _g_plugin $<
 
-test.gresource: test.gresource.xml Makefile $(shell $(glib_compile_resources) --generate-dependencies $(srcdir)/test.gresource.xml)
+test.gresource: test.gresource.xml Makefile $(shell $(glib_compile_resources) --sourcedir=$(srcdir) --generate-dependencies $(srcdir)/test.gresource.xml)
 	$(AM_V_GEN) $(glib_compile_resources) --target=$@ --sourcedir=$(srcdir) $<
 
 noinst_LTLIBRARIES = libresourceplugin.la

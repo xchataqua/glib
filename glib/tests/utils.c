@@ -341,6 +341,16 @@ test_gettext (void)
 }
 
 static void
+test_username (void)
+{
+  const gchar *name;
+
+  name = g_get_user_name ();
+
+  g_assert (name != NULL);
+}
+
+static void
 test_realname (void)
 {
   const gchar *name;
@@ -430,6 +440,63 @@ test_special_dir (void)
   g_assert_cmpstr (dir, ==, dir2);
 }
 
+static void
+test_desktop_special_dir (void)
+{
+  const gchar *dir, *dir2;
+
+  dir = g_get_user_special_dir (G_USER_DIRECTORY_DESKTOP);
+  g_assert (dir != NULL);
+
+  g_reload_user_special_dirs_cache ();
+  dir2 = g_get_user_special_dir (G_USER_DIRECTORY_DESKTOP);
+  g_assert (dir2 != NULL);
+}
+
+static void
+test_clear_pointer (void)
+{
+  gpointer a;
+
+  a = g_malloc (5);
+  g_clear_pointer (&a, g_free);
+  g_assert (a == NULL);
+
+  a = g_malloc (5);
+  (g_clear_pointer) (&a, g_free);
+  g_assert (a == NULL);
+}
+
+static void
+test_misc_mem (void)
+{
+  gpointer a;
+
+  a = g_try_malloc (0);
+  g_assert (a == NULL);
+
+  a = g_try_malloc0 (0);
+  g_assert (a == NULL);
+
+  a = g_malloc (16);
+  a = g_try_realloc (a, 20);
+  a = g_try_realloc (a, 0);
+
+  g_assert (a == NULL);
+}
+
+static void
+test_nullify (void)
+{
+  gpointer p = &test_nullify;
+
+  g_assert (p != NULL);
+
+  g_nullify_pointer (&p);
+
+  g_assert (p == NULL);
+}
+
 int
 main (int   argc,
       char *argv[])
@@ -456,10 +523,15 @@ main (int   argc,
   g_test_add_func ("/utils/codeset", test_codeset);
   g_test_add_func ("/utils/basename", test_basename);
   g_test_add_func ("/utils/gettext", test_gettext);
+  g_test_add_func ("/utils/username", test_username);
   g_test_add_func ("/utils/realname", test_realname);
   g_test_add_func ("/utils/hostname", test_hostname);
   g_test_add_func ("/utils/xdgdirs", test_xdg_dirs);
   g_test_add_func ("/utils/specialdir", test_special_dir);
+  g_test_add_func ("/utils/specialdir/desktop", test_desktop_special_dir);
+  g_test_add_func ("/utils/clear-pointer", test_clear_pointer);
+  g_test_add_func ("/utils/misc-mem", test_misc_mem);
+  g_test_add_func ("/utils/nullify", test_nullify);
 
-  return g_test_run();
+  return g_test_run ();
 }

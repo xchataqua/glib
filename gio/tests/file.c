@@ -122,8 +122,11 @@ monitor_changed (GFileMonitor      *monitor,
                  gpointer           user_data)
 {
   CreateDeleteData *data = user_data;
+  gchar *path;
 
-  g_assert_cmpstr (data->monitor_path, ==, g_file_get_path (file));
+  path = g_file_get_path (file);
+  g_assert_cmpstr (data->monitor_path, ==, path);
+  g_free (path);
 
   if (event_type == G_FILE_MONITOR_EVENT_CREATED)
     data->monitor_created++;
@@ -420,6 +423,17 @@ test_create_delete (gconstpointer d)
   error = NULL;
   data->monitor = g_file_monitor_file (data->file, 0, NULL, &error);
   g_assert_no_error (error);
+
+  /* This test doesn't work with GPollFileMonitor, because it assumes
+   * that the monitor will notice a create immediately followed by a
+   * delete, rather than coalescing them into nothing.
+   */
+  if (!strcmp (G_OBJECT_TYPE_NAME (data->monitor), "GPollFileMonitor"))
+    {
+      g_print ("skipping test for this GFileMonitor implementation");
+      goto skip;
+    }
+
   g_file_monitor_set_rate_limit (data->monitor, 100);
 
   g_signal_connect (data->monitor, "changed", G_CALLBACK (monitor_changed), data);
@@ -441,9 +455,11 @@ test_create_delete (gconstpointer d)
   g_assert (g_file_monitor_is_cancelled (data->monitor));
 
   g_main_loop_unref (data->loop);
-  g_object_unref (data->monitor);
   g_object_unref (data->ostream);
   g_object_unref (data->istream);
+
+ skip:
+  g_object_unref (data->monitor);
   g_object_unref (data->file);
   free (data->monitor_path);
   g_free (data->buffer);
@@ -592,11 +608,51 @@ test_replace_load (void)
   free (path);
 }
 
+static void
+on_file_deleted (GObject      *object,
+		 GAsyncResult *result,
+		 gpointer      user_data)
+{
+  GError *local_error = NULL;
+  GMainLoop *loop = user_data;
+
+  (void) g_file_delete_finish ((GFile*)object, result, &local_error);
+  g_assert_no_error (local_error);
+
+  g_main_loop_quit (loop);
+}
+
+static void
+test_async_delete (void)
+{
+  GFile *file;
+  GFileIOStream *iostream;
+  GError *local_error = NULL;
+  GError **error = &local_error;
+  GMainLoop *loop;
+
+  file = g_file_new_tmp ("g_file_delete_XXXXXX",
+			 &iostream, error);
+  g_assert_no_error (local_error);
+  g_object_unref (iostream);
+
+  g_assert (g_file_query_exists (file, NULL));
+
+  loop = g_main_loop_new (NULL, TRUE);
+
+  g_file_delete_async (file, G_PRIORITY_DEFAULT, NULL, on_file_deleted, loop);
+
+  g_main_loop_run (loop);
+
+  g_assert (!g_file_query_exists (file, NULL));
+
+  g_main_loop_unref (loop);
+  g_object_unref (file);
+}
+
 int
 main (int argc, char *argv[])
 {
-  g_type_init ();
-
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/file/basic", test_basic);
@@ -609,6 +665,7 @@ main (int argc, char *argv[])
   g_test_add_data_func ("/file/async-create-delete/25", GINT_TO_POINTER (25), test_create_delete);
   g_test_add_data_func ("/file/async-create-delete/4096", GINT_TO_POINTER (4096), test_create_delete);
   g_test_add_func ("/file/replace-load", test_replace_load);
+  g_test_add_func ("/file/async-delete", test_async_delete);
 
   return g_test_run ();
 }

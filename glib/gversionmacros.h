@@ -87,6 +87,16 @@
  */
 #define GLIB_VERSION_2_34       (G_ENCODE_VERSION (2, 34))
 
+/**
+ * GLIB_VERSION_2_36:
+ *
+ * A macro that evaluates to the 2.36 version of GLib, in a format
+ * that can be used by the C pre-processor.
+ *
+ * Since: 2.36
+ */
+#define GLIB_VERSION_2_36       (G_ENCODE_VERSION (2, 36))
+
 /* evaluates to the current stable version; for development cycles,
  * this means the next stable target
  */
@@ -111,16 +121,25 @@
  * The definition should be one of the predefined GLib version
  * macros: %GLIB_VERSION_2_26, %GLIB_VERSION_2_28,...
  *
- * This macro defines the lower bound for the GLib API to use.
+ * This macro defines the earliest version of GLib that the package is
+ * required to be able to compile against.
  *
- * If a function has been deprecated in a newer version of GLib,
- * it is possible to use this symbol to avoid the compiler warnings
- * without disabling warning for every deprecated function.
+ * If the compiler is configured to warn about the use of deprecated
+ * functions, then using functions that were deprecated in version
+ * %GLIB_VERSION_MIN_REQUIRED or earlier will cause warnings (but
+ * using functions deprecated in later releases will not).
  *
  * Since: 2.32
  */
+/* If the package sets GLIB_VERSION_MIN_REQUIRED to some future
+ * GLIB_VERSION_X_Y value that we don't know about, it will compare as
+ * 0 in preprocessor tests.
+ */
 #ifndef GLIB_VERSION_MIN_REQUIRED
-# define GLIB_VERSION_MIN_REQUIRED      (GLIB_VERSION_PREV_STABLE)
+# define GLIB_VERSION_MIN_REQUIRED      (GLIB_VERSION_CUR_STABLE)
+#elif GLIB_VERSION_MIN_REQUIRED == 0
+# undef  GLIB_VERSION_MIN_REQUIRED
+# define GLIB_VERSION_MIN_REQUIRED      (GLIB_VERSION_CUR_STABLE + 2)
 #endif
 
 /**
@@ -131,23 +150,28 @@
  * The definition should be one of the predefined GLib version
  * macros: %GLIB_VERSION_2_26, %GLIB_VERSION_2_28,...
  *
- * This macro defines the upper bound for the GLib API to use.
+ * This macro defines the latest version of the GLib API that the
+ * package is allowed to make use of.
  *
- * If a function has been introduced in a newer version of GLib,
- * it is possible to use this symbol to get compiler warnings when
- * trying to use that function.
+ * If the compiler is configured to warn about the use of deprecated
+ * functions, then using functions added after version
+ * %GLIB_VERSION_MAX_ALLOWED will cause warnings.
+ *
+ * Unless you are using GLIB_CHECK_VERSION() or the like to compile
+ * different code depending on the GLib version, then this should be
+ * set to the same value as %GLIB_VERSION_MIN_REQUIRED.
  *
  * Since: 2.32
  */
-#ifndef GLIB_VERSION_MAX_ALLOWED
-# if GLIB_VERSION_MIN_REQUIRED > GLIB_VERSION_PREV_STABLE
-#  define GLIB_VERSION_MAX_ALLOWED      GLIB_VERSION_MIN_REQUIRED
-# else
-#  define GLIB_VERSION_MAX_ALLOWED      GLIB_VERSION_CUR_STABLE
-# endif
+#if !defined (GLIB_VERSION_MAX_ALLOWED) || (GLIB_VERSION_MAX_ALLOWED == 0)
+# undef GLIB_VERSION_MAX_ALLOWED
+# define GLIB_VERSION_MAX_ALLOWED      (GLIB_VERSION_CUR_STABLE)
 #endif
 
 /* sanity checks */
+#if GLIB_VERSION_MIN_REQUIRED > GLIB_VERSION_CUR_STABLE
+#error "GLIB_VERSION_MIN_REQUIRED must be <= GLIB_VERSION_CUR_STABLE"
+#endif
 #if GLIB_VERSION_MAX_ALLOWED < GLIB_VERSION_MIN_REQUIRED
 #error "GLIB_VERSION_MAX_ALLOWED must be >= GLIB_VERSION_MIN_REQUIRED"
 #endif
@@ -231,6 +255,20 @@
 # define GLIB_AVAILABLE_IN_2_34                 GLIB_UNAVAILABLE(2, 34)
 #else
 # define GLIB_AVAILABLE_IN_2_34
+#endif
+
+#if GLIB_VERSION_MIN_REQUIRED >= GLIB_VERSION_2_36
+# define GLIB_DEPRECATED_IN_2_36                GLIB_DEPRECATED
+# define GLIB_DEPRECATED_IN_2_36_FOR(f)         GLIB_DEPRECATED_FOR(f)
+#else
+# define GLIB_DEPRECATED_IN_2_36
+# define GLIB_DEPRECATED_IN_2_36_FOR(f)
+#endif
+
+#if GLIB_VERSION_MAX_ALLOWED < GLIB_VERSION_2_36
+# define GLIB_AVAILABLE_IN_2_36                 GLIB_UNAVAILABLE(2, 36)
+#else
+# define GLIB_AVAILABLE_IN_2_36
 #endif
 
 #endif /*  __G_VERSION_MACROS_H__ */

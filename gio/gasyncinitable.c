@@ -24,6 +24,7 @@
 #include "gasyncinitable.h"
 #include "gasyncresult.h"
 #include "gsimpleasyncresult.h"
+#include "gtask.h"
 #include "glibintl.h"
 
 
@@ -64,13 +65,13 @@
  *
  *   for (l = self->priv->init_results; l != NULL; l = l->next)
  *     {
- *       GSimpleAsyncResult *simple = l->data;
+ *       GTask *task = l->data;
  *
- *       if (!self->priv->success)
- *         g_simple_async_result_set_error (simple, ...);
- *
- *       g_simple_async_result_complete (simple);
- *       g_object_unref (simple);
+ *       if (self->priv->success)
+ *         g_task_return_boolean (task, TRUE);
+ *       else
+ *         g_task_return_new_error (task, ...);
+ *       g_object_unref (task);
  *     }
  *
  *   g_list_free (self->priv->init_results);
@@ -85,31 +86,28 @@
  *                 gpointer              user_data)
  * {
  *   Foo *self = FOO (initable);
- *   GSimpleAsyncResult *simple;
+ *   GTask *task;
  *
- *   simple = g_simple_async_result_new (G_OBJECT (initable)
- *                                       callback,
- *                                       user_data,
- *                                       foo_init_async);
+ *   task = g_task_new (initable, cancellable, callback, user_data);
  *
  *   switch (self->priv->state)
  *     {
  *       case NOT_INITIALIZED:
  *         _foo_get_ready (self);
  *         self->priv->init_results = g_list_append (self->priv->init_results,
- *                                                   simple);
+ *                                                   task);
  *         self->priv->state = INITIALIZING;
  *         break;
  *       case INITIALIZING:
  *         self->priv->init_results = g_list_append (self->priv->init_results,
- *                                                   simple);
+ *                                                   task);
  *         break;
  *       case INITIALIZED:
  *         if (!self->priv->success)
- *           g_simple_async_result_set_error (simple, ...);
- *
- *         g_simple_async_result_complete_in_idle (simple);
- *         g_object_unref (simple);
+ *           g_task_return_new_error (task, ...);
+ *         else
+ *           g_task_return_boolean (task, TRUE);
+ *         g_object_unref (task);
  *         break;
  *     }
  * }
@@ -119,14 +117,9 @@
  *                  GAsyncResult         *result,
  *                  GError              **error)
  * {
- *   g_return_val_if_fail (g_simple_async_result_is_valid (result,
- *       G_OBJECT (initable), foo_init_async), FALSE);
+ *   g_return_val_if_fail (g_task_is_valid (result, initable), FALSE);
  *
- *   if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (result),
- *           error))
- *     return FALSE;
- *
- *   return TRUE;
+ *   return g_task_propagate_boolean (G_TASK (result), error);
  * }
  *
  * static void
@@ -248,12 +241,8 @@ g_async_initable_init_finish (GAsyncInitable  *initable,
   g_return_val_if_fail (G_IS_ASYNC_INITABLE (initable), FALSE);
   g_return_val_if_fail (G_IS_ASYNC_RESULT (res), FALSE);
 
-  if (G_IS_SIMPLE_ASYNC_RESULT (res))
-    {
-      GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (res);
-      if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
-    }
+  if (g_async_result_legacy_propagate_error (res, error))
+    return FALSE;
 
   iface = G_ASYNC_INITABLE_GET_IFACE (initable);
 
@@ -261,14 +250,17 @@ g_async_initable_init_finish (GAsyncInitable  *initable,
 }
 
 static void
-async_init_thread (GSimpleAsyncResult *res,
-		   GObject            *object,
-		   GCancellable       *cancellable)
+async_init_thread (GTask        *task,
+                   gpointer      source_object,
+                   gpointer      task_data,
+                   GCancellable *cancellable)
 {
   GError *error = NULL;
 
-  if (!g_initable_init (G_INITABLE (object), cancellable, &error))
-    g_simple_async_result_take_error (res, error);
+  if (g_initable_init (G_INITABLE (source_object), cancellable, &error))
+    g_task_return_boolean (task, TRUE);
+  else
+    g_task_return_error (task, error);
 }
 
 static void
@@ -278,15 +270,14 @@ g_async_initable_real_init_async (GAsyncInitable      *initable,
 				  GAsyncReadyCallback  callback,
 				  gpointer             user_data)
 {
-  GSimpleAsyncResult *res;
+  GTask *task;
 
   g_return_if_fail (G_IS_INITABLE (initable));
 
-  res = g_simple_async_result_new (G_OBJECT (initable), callback, user_data,
-				   g_async_initable_real_init_async);
-  g_simple_async_result_run_in_thread (res, async_init_thread,
-				       io_priority, cancellable);
-  g_object_unref (res);
+  task = g_task_new (initable, cancellable, callback, user_data);
+  g_task_set_priority (task, io_priority);
+  g_task_run_in_thread (task, async_init_thread);
+  g_object_unref (task);
 }
 
 static gboolean
@@ -294,19 +285,22 @@ g_async_initable_real_init_finish (GAsyncInitable  *initable,
 				   GAsyncResult    *res,
 				   GError         **error)
 {
-  /* Although g_async_initable_init_finish() does this error handling
-   * as well, we do it here too, so that a class that reimplements
-   * GAsyncInitable can properly run its parent class's implementation
-   * by directly invoking its ->init_async() and ->init_finish().
+  /* For backward compatibility we have to process GSimpleAsyncResults
+   * even though g_async_initable_real_init_async doesn't generate
+   * them any more.
    */
   if (G_IS_SIMPLE_ASYNC_RESULT (res))
     {
       GSimpleAsyncResult *simple = G_SIMPLE_ASYNC_RESULT (res);
       if (g_simple_async_result_propagate_error (simple, error))
-	return FALSE;
+        return FALSE;
+      else
+        return TRUE;
     }
 
-  return TRUE;
+  g_return_val_if_fail (g_task_is_valid (res, initable), FALSE);
+
+  return g_task_propagate_boolean (G_TASK (res), error);
 }
 
 /**

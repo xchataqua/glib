@@ -118,6 +118,8 @@ GLIB_VERSION_2_26
 GLIB_VERSION_2_28
 GLIB_VERSION_2_30
 GLIB_VERSION_2_32
+GLIB_VERSION_2_34
+GLIB_VERSION_2_36
 GLIB_VERSION_MIN_REQUIRED
 GLIB_VERSION_MAX_ALLOWED
 GLIB_DISABLE_DEPRECATION_WARNINGS
@@ -1005,6 +1007,7 @@ g_regex_unref
 g_regex_get_pattern
 g_regex_get_max_backref
 g_regex_get_capture_count
+g_regex_get_has_cr_or_lf
 g_regex_get_string_number
 g_regex_get_compile_flags
 g_regex_get_match_flags
@@ -1092,6 +1095,7 @@ GSpawnChildSetupFunc
 g_spawn_async_with_pipes
 g_spawn_async
 g_spawn_sync
+g_spawn_check_exit_status
 g_spawn_command_line_async
 g_spawn_command_line_sync
 g_spawn_close_pid
@@ -1222,6 +1226,7 @@ g_mapped_file_unref
 g_mapped_file_free
 g_mapped_file_get_length
 g_mapped_file_get_contents
+g_mapped_file_get_bytes
 
 <SUBSECTION>
 g_open
@@ -2051,6 +2056,7 @@ g_list_free1
 <SUBSECTION>
 g_list_length
 g_list_copy
+g_list_copy_deep
 g_list_reverse
 g_list_sort
 GCompareFunc
@@ -2101,6 +2107,7 @@ g_slist_free1
 <SUBSECTION>
 g_slist_length
 g_slist_copy
+g_slist_copy_deep
 g_slist_reverse
 g_slist_insert_sorted_with_data
 g_slist_sort
@@ -2323,6 +2330,7 @@ g_string_erase
 g_string_truncate
 g_string_set_size
 g_string_free
+g_string_free_to_bytes
 
 <SUBSECTION>
 g_string_up
@@ -2532,6 +2540,7 @@ g_node_destroy
 <TITLE>Quarks</TITLE>
 <FILE>quarks</FILE>
 GQuark
+G_DEFINE_QUARK
 g_quark_from_string
 g_quark_from_static_string
 g_quark_to_string
@@ -2552,6 +2561,9 @@ g_datalist_id_set_data_full
 g_datalist_id_get_data
 g_datalist_id_remove_data
 g_datalist_id_remove_no_notify
+GDuplicateFunc
+g_datalist_id_dup_data
+g_datalist_id_replace_data
 
 <SUBSECTION>
 g_datalist_set_data
@@ -2840,6 +2852,7 @@ g_checksum_get_digest
 <SUBSECTION>
 g_compute_checksum_for_data
 g_compute_checksum_for_string
+g_compute_checksum_for_bytes
 </SECTION>
 
 <SECTION>
@@ -2876,6 +2889,7 @@ GTestFunc
 g_test_add_func
 GTestDataFunc
 g_test_add_data_func
+g_test_add_data_func_full
 g_test_add
 
 g_test_fail
@@ -2892,6 +2906,9 @@ g_test_timer_last
 g_test_queue_free
 g_test_queue_destroy
 g_test_queue_unref
+
+g_test_expect_message
+g_test_assert_expected_messages
 
 GTestTrapFlags
 g_test_trap_fork
@@ -2937,6 +2954,7 @@ g_assertion_message_expr
 g_assertion_message_cmpstr
 g_assertion_message_cmpnum
 g_assertion_message_error
+g_test_assert_expected_messages_internal
 
 g_test_config_vars
 
@@ -3049,6 +3067,7 @@ g_variant_classify
 GVariantClass
 
 <SUBSECTION>
+g_variant_check_format_string
 g_variant_get
 g_variant_get_va
 g_variant_new

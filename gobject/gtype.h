@@ -47,7 +47,6 @@ G_BEGIN_DECLS
 #define	G_TYPE_FUNDAMENTAL_MAX		(255 << G_TYPE_FUNDAMENTAL_SHIFT)
 
 /* Constant fundamental types,
- * introduced by g_type_init().
  */
 /**
  * G_TYPE_INVALID:
@@ -647,12 +646,14 @@ struct _GTypeQuery
  * @G_TYPE_DEBUG_OBJECTS: Print messages about object bookkeeping.
  * @G_TYPE_DEBUG_SIGNALS: Print messages about signal emissions.
  * @G_TYPE_DEBUG_MASK: Mask covering all debug flags.
- * 
- * The <type>GTypeDebugFlags</type> enumeration values can be passed to
- * g_type_init_with_debug_flags() to trigger debugging messages during runtime.
- * Note that the messages can also be triggered by setting the
- * <envar>GOBJECT_DEBUG</envar> environment variable to a ':'-separated list of 
- * "objects" and "signals".
+ *
+ * These flags used to be passed to g_type_init_with_debug_flags() which
+ * is now deprecated.
+ *
+ * If you need to enable debugging features, use the GOBJECT_DEBUG
+ * environment variable.
+ *
+ * Deprecated: 2.36: g_type_init() is now done automatically
  */
 typedef enum	/*< skip >*/
 {
@@ -664,7 +665,9 @@ typedef enum	/*< skip >*/
 
 
 /* --- prototypes --- */
+GLIB_DEPRECATED_IN_2_36
 void                  g_type_init                    (void);
+GLIB_DEPRECATED_IN_2_36
 void                  g_type_init_with_debug_flags   (GTypeDebugFlags  debug_flags);
 const gchar *         g_type_name                    (GType            type);
 GQuark                g_type_qname                   (GType            type);
@@ -1206,12 +1209,12 @@ struct _GTypeValueTable
 				  GValue       *dest_value);
   /* varargs functionality (optional) */
   gpointer (*value_peek_pointer) (const GValue *value);
-  gchar	    *collect_format;
+  const gchar *collect_format;
   gchar*   (*collect_value)      (GValue       *value,
 				  guint         n_collect_values,
 				  GTypeCValue  *collect_values,
 				  guint		collect_flags);
-  gchar	    *lcopy_format;
+  const gchar *lcopy_format;
   gchar*   (*lcopy_value)        (const GValue *value,
 				  guint         n_collect_values,
 				  GTypeCValue  *collect_values,
@@ -1258,6 +1261,8 @@ void      g_type_add_class_private      (GType    		     class_type,
 gpointer  g_type_class_get_private      (GTypeClass 		    *klass,
 					 GType			     private_type);
 
+GLIB_AVAILABLE_IN_2_34
+void      g_type_ensure                 (GType                       type);
 
 /* --- GType boilerplate --- */
 /**

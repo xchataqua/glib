@@ -44,6 +44,10 @@
 # include <sys/ioctl.h>
 #endif
 
+#ifdef HAVE_SYS_FILIO_H
+# include <sys/filio.h>
+#endif
+
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
 #endif
@@ -742,11 +746,9 @@ static void
 g_socket_class_init (GSocketClass *klass)
 {
   GObjectClass *gobject_class G_GNUC_UNUSED = G_OBJECT_CLASS (klass);
-  volatile GType type;
 
   /* Make sure winsock has been initialized */
-  type = g_inet_address_get_type ();
-  (type); /* To avoid -Wunused-but-set-variable */
+  g_type_ensure (G_TYPE_INET_ADDRESS);
 
 #ifdef SIGPIPE
   /* There is no portable, thread-safe way to avoid having the process
@@ -1673,7 +1675,7 @@ g_socket_get_protocol (GSocket *socket)
  * @socket: a #GSocket.
  *
  * Returns the underlying OS socket object. On unix this
- * is a socket file descriptor, and on windows this is
+ * is a socket file descriptor, and on Windows this is
  * a Winsock2 SOCKET handle. This may be useful for
  * doing platform specific or otherwise unusual operations
  * on the socket.
@@ -1872,7 +1874,7 @@ g_socket_bind (GSocket         *socket,
   if (!check_socket (socket, error))
     return FALSE;
 
-  /* SO_REUSEADDR on windows means something else and is not what we want.
+  /* SO_REUSEADDR on Windows means something else and is not what we want.
      It always allows the unix variant of SO_REUSEADDR anyway */
 #ifndef G_OS_WIN32
   {
@@ -3820,7 +3822,7 @@ g_socket_send_message (GSocket                *socket,
     if (num_messages != 0)
       {
         g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
-                             _("GSocketControlMessage not supported on windows"));
+                             _("GSocketControlMessage not supported on Windows"));
 	return -1;
       }
 

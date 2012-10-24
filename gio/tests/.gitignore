@@ -24,9 +24,11 @@ gapplication-example-actions
 gapplication-example-cmdline
 gapplication-example-cmdline2
 gapplication-example-cmdline3
+gapplication-example-dbushooks
 gapplication-example-menu
 gapplication-example-open
 gdbus-addresses
+gdbus-auth
 gdbus-bz627724
 gdbus-close-pending
 gdbus-connection
@@ -34,6 +36,7 @@ gdbus-connection-flush
 gdbus-connection-flush-helper
 gdbus-connection-loss
 gdbus-connection-slow
+gdbus-daemon
 gdbus-error
 gdbus-example-export
 gdbus-example-objectmanager-client
@@ -69,6 +72,7 @@ gsettings
 gsettings.store
 httpd
 icons
+inet-address
 io-stream
 live-g-file
 memory-input-stream
@@ -77,9 +81,11 @@ mimeapps
 network-address
 network-monitor
 org.gtk.test.enums.xml
+permission
 pollable
 plugin_resources.c
 proxy
+proxy-test
 readwrite
 resolver
 resources
@@ -90,6 +96,7 @@ socket
 socket-client
 socket-server
 srvtarget
+task
 test.mo
 test.gresource
 test_resources.c

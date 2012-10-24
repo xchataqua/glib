@@ -261,7 +261,6 @@ static glong
 _g_utf8_strwidth (const gchar *p)
 {
   glong len = 0;
-  const gchar *start = p;
   g_return_val_if_fail (p != NULL, 0);
 
   while (*p)
@@ -273,12 +272,7 @@ _g_utf8_strwidth (const gchar *p)
   return len;
 }
 
-
-GQuark
-g_option_error_quark (void)
-{
-  return g_quark_from_static_string ("g-option-context-error-quark");
-}
+G_DEFINE_QUARK (g-option-context-error-quark, g_option_error)
 
 /**
  * g_option_context_new:
@@ -640,6 +634,8 @@ group_has_visible_entries (GOptionContext *context,
 
       if (main_entries && !main_group && !(entry->flags & G_OPTION_FLAG_IN_MAIN))
         continue;
+      if (entry->long_name[0] == 0) /* ignore rest entry */
+        continue;
       if (!(entry->flags & reject_filter))
         return TRUE;
     }
@@ -648,7 +644,7 @@ group_has_visible_entries (GOptionContext *context,
 }
 
 static gboolean
-group_list_has_visible_entires (GOptionContext *context,
+group_list_has_visible_entries (GOptionContext *context,
                                 GList          *group_list,
                                 gboolean       main_entries)
 {
@@ -914,7 +910,7 @@ g_option_context_get_help (GOptionContext *context,
   /* Print application options if --help or --help-all has been specified */
   if ((main_help || !group) &&
       (group_has_visible_entries (context, context->main_group, TRUE) ||
-       group_list_has_visible_entires (context, context->groups, TRUE)))
+       group_list_has_visible_entries (context, context->groups, TRUE)))
     {
       list = context->groups;
 
@@ -1680,7 +1676,7 @@ platform_get_argv0 (void)
 
   cmdline = (char **) realloc (cmdline, len);
 
-  if (sysctl (mib, nitems (mib), cmdline, &len, NULL, 0) == -1)
+  if (sysctl (mib, G_N_ELEMENTS (mib), cmdline, &len, NULL, 0) == -1)
     {
       g_free (cmdline);
       return NULL;

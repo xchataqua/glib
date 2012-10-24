@@ -297,7 +297,7 @@ test_seek (void)
   error = NULL;
 
   /* Seek by read */
-  g_assert_cmpstr (g_seekable_tell (G_SEEKABLE (in)), ==, 0);
+  g_assert_cmpint (g_seekable_tell (G_SEEKABLE (in)), ==, 0);
   byte = g_buffered_input_stream_read_byte (G_BUFFERED_INPUT_STREAM (in), NULL, &error);
   g_assert_no_error (error);
   g_assert_cmpint (byte, ==, 'a');
@@ -372,7 +372,6 @@ int
 main (int   argc,
       char *argv[])
 {
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
   g_test_bug_base ("http://bugzilla.gnome.org/");
 

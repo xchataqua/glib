@@ -37,6 +37,7 @@
 #endif
 
 #include <gio/gio.h>
+#include <glib/gstdio.h>
 #include <gi18n.h>
 
 /* GResource functions {{{1 */
@@ -142,7 +143,7 @@ get_elf (const gchar *file,
   if (elf_version (EV_CURRENT) == EV_NONE )
     return NULL;
 
-  *fd = open (file, O_RDONLY);
+  *fd = g_open (file, O_RDONLY, 0);
   if (*fd < 0)
     return NULL;
 
@@ -600,8 +601,6 @@ main (int argc, char *argv[])
 #ifdef HAVE_BIND_TEXTDOMAIN_CODESET
   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 #endif
-
-  g_type_init ();
 
   if (argc < 2)
     return cmd_help (FALSE, NULL);

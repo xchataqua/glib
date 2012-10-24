@@ -16,6 +16,7 @@ g_boxed_free
 g_boxed_type_register_static
 g_date_get_type
 g_date_time_get_type
+g_time_zone_get_type
 g_gstring_get_type
 g_strv_get_type
 g_hash_table_get_type
@@ -137,8 +138,12 @@ g_object_disconnect
 g_object_freeze_notify
 g_object_get
 g_object_get_data
+g_object_replace_data
+g_object_dup_data
 g_object_get_property
 g_object_get_qdata
+g_object_dup_qdata
+g_object_replace_qdata
 g_object_get_type
 g_object_get_valist
 g_object_interface_find_property
@@ -336,6 +341,7 @@ g_type_default_interface_peek
 g_type_default_interface_ref
 g_type_default_interface_unref
 g_type_depth
+g_type_ensure
 g_type_free_instance
 g_type_from_name
 g_type_fundamental

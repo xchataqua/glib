@@ -964,7 +964,7 @@ check_bar_proxy (FooiGenBar *proxy,
    * properties.
    *
    * On the first reception, y and i should both be increased by
-   * two. On the the second reception, only by one. The signal handler
+   * two. On the second reception, only by one. The signal handler
    * checks this.
    *
    * This also checks that _drain_notify() works.
@@ -1730,10 +1730,23 @@ on_object_proxy_removed (GDBusObjectManagerClient  *manager,
 }
 
 static void
+property_d_changed (GObject    *object,
+		    GParamSpec *pspec,
+		    gpointer    user_data)
+{
+  gboolean *changed = user_data;
+
+  *changed = TRUE;
+}
+
+static void
 om_check_property_and_signal_emission (GMainLoop  *loop,
                                        FooiGenBar *skeleton,
                                        FooiGenBar *proxy)
 {
+  gboolean d_changed = FALSE;
+  guint handler;
+
   /* First PropertiesChanged */
   g_assert_cmpint (foo_igen_bar_get_i (skeleton), ==, 0);
   g_assert_cmpint (foo_igen_bar_get_i (proxy), ==, 0);
@@ -1741,6 +1754,24 @@ om_check_property_and_signal_emission (GMainLoop  *loop,
   _g_assert_property_notify (proxy, "i");
   g_assert_cmpint (foo_igen_bar_get_i (skeleton), ==, 1);
   g_assert_cmpint (foo_igen_bar_get_i (proxy), ==, 1);
+
+  /* Double-check the gdouble case */
+  g_assert_cmpfloat (foo_igen_bar_get_d (skeleton), ==, 0.0);
+  g_assert_cmpfloat (foo_igen_bar_get_d (proxy), ==, 0.0);
+  foo_igen_bar_set_d (skeleton, 1.0);
+  _g_assert_property_notify (proxy, "d");
+
+  /* Verify that re-setting it to the same value doesn't cause a
+   * notify on the proxy, by taking advantage of the fact that
+   * notifications are serialized.
+   */
+  handler = g_signal_connect (proxy, "notify::d",
+			      G_CALLBACK (property_d_changed), &d_changed);
+  foo_igen_bar_set_d (skeleton, 1.0);
+  foo_igen_bar_set_i (skeleton, 2);
+  _g_assert_property_notify (proxy, "i");
+  g_assert (d_changed == FALSE);
+  g_signal_handler_disconnect (proxy, handler);
 
   /* Then just a regular signal */
   foo_igen_bar_emit_another_signal (skeleton, "word");
@@ -1837,7 +1868,7 @@ check_object_manager (void)
   om_check_get_all (c, loop,
                     "(@a{oa{sa{sv}}} {},)");
 
-  /* Now try to create the the proxy manager again - this time it should work */
+  /* Now try to create the proxy manager again - this time it should work */
   error = NULL;
   foo_igen_object_manager_client_new (c,
                                       G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
@@ -2290,13 +2321,39 @@ test_interface_stability (void)
 
 /* ---------------------------------------------------------------------------------------------------- */
 
+/* property naming
+ *
+ * - check that a property with name "Type" is mapped into g-name "type"
+ *   with C accessors get_type_ (to avoid clashing with the GType accessor)
+ *   and set_type_ (for symmetri)
+ *   (see https://bugzilla.gnome.org/show_bug.cgi?id=679473 for details)
+ *
+ * - (could add more tests here)
+ */
+
+static void
+test_property_naming (void)
+{
+  gpointer c_getter_name = foo_igen_naming_get_type_;
+  gpointer c_setter_name = foo_igen_naming_set_type_;
+  FooiGenNaming *skel;
+
+  (void) c_getter_name;
+  (void) c_setter_name;
+
+  skel = foo_igen_naming_skeleton_new ();
+  g_assert (g_object_class_find_property (G_OBJECT_GET_CLASS (skel), "type") != NULL);
+  g_object_unref (skel);
+}
+
+/* ---------------------------------------------------------------------------------------------------- */
+
 int
 main (int   argc,
       char *argv[])
 {
   gint ret;
 
-  g_type_init ();
   g_test_init (&argc, &argv, NULL);
 
   session_bus_up ();
@@ -2304,6 +2361,7 @@ main (int   argc,
   g_test_add_func ("/gdbus/codegen/annotations", test_annotations);
   g_test_add_func ("/gdbus/codegen/interface_stability", test_interface_stability);
   g_test_add_func ("/gdbus/codegen/object-manager", test_object_manager);
+  g_test_add_func ("/gdbus/codegen/property-naming", test_property_naming);
 
   ret = g_test_run();
 

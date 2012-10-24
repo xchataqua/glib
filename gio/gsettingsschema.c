@@ -33,7 +33,7 @@
 /**
  * SECTION:gsettingsschema
  * @short_description: introspecting and controlling the loading of
- *                     #GSettings schemas
+ *                     GSettings schemas
  *
  * The #GSettingsSchemaSource and #GSettingsSchema APIs provide a
  * mechanism for advanced control over the loading of schemas and a
@@ -270,7 +270,7 @@ g_settings_schema_source_unref (GSettingsSchemaSource *source)
  * source, the lookup will recurse to the parent.
  *
  * Second, any references to other schemas specified within this
- * source (ie: <literal>child</literal> or <literal>extents</literal>)
+ * source (ie: <literal>child</literal> or <literal>extends</literal>)
  * references may be resolved from the @parent.
  *
  * For this second reason, except in very unusual situations, the
@@ -636,7 +636,7 @@ g_settings_schema_get_value (GSettingsSchema *schema,
 
   value = gvdb_table_get_raw_value (schema->table, key);
 
-  if G_UNLIKELY (value == NULL)
+  if G_UNLIKELY (value == NULL || !g_variant_is_of_type (value, G_VARIANT_TYPE_TUPLE))
     g_error ("Settings schema '%s' does not contain a key named '%s'", schema->id, key);
 
   iter = g_variant_iter_new (value);

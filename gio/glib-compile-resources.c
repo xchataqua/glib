@@ -33,9 +33,6 @@
 #ifdef G_OS_WIN32
 #include <io.h>
 #endif
-#ifdef HAVE_SYS_WAIT_H
-#include <sys/wait.h>
-#endif
 
 #include <gio/gmemoryoutputstream.h>
 #include <gio/gzlibcompressor.h>
@@ -298,6 +295,7 @@ end_element (GMarkupParseContext  *context,
             {
               gchar *argv[8];
               int status, fd, argc;
+              gchar *stderr_child = NULL;
 
               tmp_file = g_strdup ("resource-XXXXXXXX");
               if ((fd = g_mkstemp (tmp_file)) == -1)
@@ -324,22 +322,23 @@ end_element (GMarkupParseContext  *context,
               g_assert (argc <= G_N_ELEMENTS (argv));
 
               if (!g_spawn_sync (NULL /* cwd */, argv, NULL /* envv */,
-                                 G_SPAWN_STDOUT_TO_DEV_NULL |
-                                 G_SPAWN_STDERR_TO_DEV_NULL,
-                                 NULL, NULL, NULL, NULL, &status, &my_error))
+                                 G_SPAWN_STDOUT_TO_DEV_NULL,
+                                 NULL, NULL, NULL, &stderr_child, &status, &my_error))
                 {
                   g_propagate_error (error, my_error);
                   goto cleanup;
                 }
-#ifdef HAVE_SYS_WAIT_H
-              if (!WIFEXITED (status) || WEXITSTATUS (status) != 0)
+	      
+	      /* Ugly...we shoud probably just let stderr be inherited */
+	      if (!g_spawn_check_exit_status (status, NULL))
                 {
-                  g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
-                                      _("Error processing input file with xmllint"));
+                  g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                               _("Error processing input file with xmllint:\n%s"), stderr_child);
+                  g_free (stderr_child);
                   goto cleanup;
                 }
-#endif
 
+              g_free (stderr_child);
               g_free (real_file);
               real_file = g_strdup (tmp_file);
             }
@@ -347,6 +346,7 @@ end_element (GMarkupParseContext  *context,
           if (to_pixdata)
             {
               gchar *argv[4];
+              gchar *stderr_child = NULL;
               int status, fd, argc;
 
               if (gdk_pixbuf_pixdata == NULL)
@@ -379,22 +379,22 @@ end_element (GMarkupParseContext  *context,
               g_assert (argc <= G_N_ELEMENTS (argv));
 
               if (!g_spawn_sync (NULL /* cwd */, argv, NULL /* envv */,
-                                 G_SPAWN_STDOUT_TO_DEV_NULL |
-                                 G_SPAWN_STDERR_TO_DEV_NULL,
-                                 NULL, NULL, NULL, NULL, &status, &my_error))
+                                 G_SPAWN_STDOUT_TO_DEV_NULL,
+                                 NULL, NULL, NULL, &stderr_child, &status, &my_error))
                 {
                   g_propagate_error (error, my_error);
                   goto cleanup;
                 }
-#ifdef HAVE_SYS_WAIT_H
-              if (!WIFEXITED (status) || WEXITSTATUS (status) != 0)
+	      
+	      if (!g_spawn_check_exit_status (status, NULL))
                 {
-                  g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
-				       _("Error processing input file with to-pixdata"));
+                  g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+			       _("Error processing input file with to-pixdata:\n%s"), stderr_child);
+                  g_free (stderr_child);
                   goto cleanup;
                 }
-#endif
 
+              g_free (stderr_child);
               g_free (real_file);
               real_file = g_strdup (tmp_file2);
             }
@@ -640,8 +640,6 @@ main (int argc, char **argv)
 #ifdef HAVE_BIND_TEXTDOMAIN_CODESET
   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 #endif
-
-  g_type_init ();
 
   context = g_option_context_new (N_("FILE"));
   g_option_context_set_translation_domain (context, GETTEXT_PACKAGE);

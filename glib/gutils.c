@@ -377,7 +377,7 @@ g_find_program_in_path (const gchar *program)
  * variable. If the program is found, the return value contains the 
  * full name including the type suffix.
  *
- * Return value: absolute path, or %NULL
+ * Return value: a newly-allocated string with the absolute path, or %NULL
  **/
 #ifdef G_OS_WIN32
 static gchar *
@@ -660,19 +660,32 @@ g_get_any_init_do (void)
   gchar hostname[100];
 
   g_tmp_dir = g_strdup (g_getenv ("TMPDIR"));
+
   if (g_tmp_dir == NULL || *g_tmp_dir == '\0')
-    g_tmp_dir = g_strdup (g_getenv ("TMP"));
+    {
+      g_free (g_tmp_dir);
+      g_tmp_dir = g_strdup (g_getenv ("TMP"));
+    }
+
   if (g_tmp_dir == NULL || *g_tmp_dir == '\0')
-    g_tmp_dir = g_strdup (g_getenv ("TEMP"));
+    {
+      g_free (g_tmp_dir);
+      g_tmp_dir = g_strdup (g_getenv ("TEMP"));
+    }
 
 #ifdef G_OS_WIN32
   if (g_tmp_dir == NULL || *g_tmp_dir == '\0')
-    g_tmp_dir = get_windows_directory_root ();
-#else  
+    {
+      g_free (g_tmp_dir);
+      g_tmp_dir = get_windows_directory_root ();
+    }
+#else
+ 
 #ifdef P_tmpdir
   if (g_tmp_dir == NULL || *g_tmp_dir == '\0')
     {
-      gsize k;    
+      gsize k;
+      g_free (g_tmp_dir);
       g_tmp_dir = g_strdup (P_tmpdir);
       k = strlen (g_tmp_dir);
       if (k > 1 && G_IS_DIR_SEPARATOR (g_tmp_dir[k - 1]))
@@ -682,6 +695,7 @@ g_get_any_init_do (void)
   
   if (g_tmp_dir == NULL || *g_tmp_dir == '\0')
     {
+      g_free (g_tmp_dir);
       g_tmp_dir = g_strdup ("/tmp");
     }
 #endif	/* !G_OS_WIN32 */
@@ -1717,14 +1731,18 @@ g_reload_user_special_dirs_cache (void)
       /* only leak changed directories */
       for (i = 0; i < G_USER_N_DIRECTORIES; i++)
         {
-	  old_val = old_g_user_special_dirs[i];
-	  if (g_strcmp0 (old_val, g_user_special_dirs[i]) == 0)
+          old_val = old_g_user_special_dirs[i];
+          if (g_user_special_dirs[i] == NULL)
             {
-	      /* don't leak */
-	      g_free (g_user_special_dirs[i]);
-	      g_user_special_dirs[i] = old_val;
+              g_user_special_dirs[i] = old_val;
             }
-	  else
+          else if (g_strcmp0 (old_val, g_user_special_dirs[i]) == 0)
+            {
+              /* don't leak */
+              g_free (g_user_special_dirs[i]);
+              g_user_special_dirs[i] = old_val;
+            }
+          else
             g_free (old_val);
         }
 
@@ -2391,3 +2409,60 @@ g_get_tmp_dir (void)
 }
 
 #endif
+
+/* Private API:
+ *
+ * Returns %TRUE if the current process was executed as setuid (or an
+ * equivalent __libc_enable_secure is available).  See:
+ * http://osdir.com/ml/linux.lfs.hardened/2007-04/msg00032.html
+ */ 
+gboolean
+g_check_setuid (void)
+{
+  /* TODO: get __libc_enable_secure exported from glibc.
+   * See http://www.openwall.com/lists/owl-dev/2012/08/14/1
+   */
+#if 0 && defined(HAVE_LIBC_ENABLE_SECURE)
+  {
+    /* See glibc/include/unistd.h */
+    extern int __libc_enable_secure;
+    return __libc_enable_secure;
+  }
+#elif defined(HAVE_ISSETUGID)
+  /* BSD: http://www.freebsd.org/cgi/man.cgi?query=issetugid&sektion=2 */
+  return issetugid ();
+#elif defined(G_OS_UNIX)
+  uid_t ruid, euid, suid; /* Real, effective and saved user ID's */
+  gid_t rgid, egid, sgid; /* Real, effective and saved group ID's */
+
+  static gsize check_setuid_initialised;
+  static gboolean is_setuid;
+
+  if (g_once_init_enter (&check_setuid_initialised))
+    {
+#ifdef HAVE_GETRESUID
+      /* These aren't in the header files, so we prototype them here.
+       */
+      int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
+      int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
+      
+      if (getresuid (&ruid, &euid, &suid) != 0 ||
+          getresgid (&rgid, &egid, &sgid) != 0)
+#endif /* HAVE_GETRESUID */
+        {
+          suid = ruid = getuid ();
+          sgid = rgid = getgid ();
+          euid = geteuid ();
+          egid = getegid ();
+        }
+
+      is_setuid = (ruid != euid || ruid != suid ||
+                   rgid != egid || rgid != sgid);
+
+      g_once_init_leave (&check_setuid_initialised, 1);
+    }
+  return is_setuid;
+#else
+  return FALSE;
+#endif
+}

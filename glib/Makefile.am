@@ -84,7 +84,7 @@ EXTRA_DIST += 			\
 	gconstructor.h		\
 	$(MIRRORING_TAB_SOURCE)
 
-CLEANFILES= libglib-gdb.py
+CLEANFILES += libglib-gdb.py
 
 # These may be in the builddir too
 BUILT_EXTRA_DIST = 		\
@@ -168,6 +168,7 @@ libglib_2_0_la_SOURCES = 	\
 	gpoll.c			\
 	gprimes.c		\
 	gqsort.c		\
+	gquark.c		\
 	gqueue.c		\
 	grand.c			\
 	gregex.c		\

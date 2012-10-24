@@ -881,7 +881,7 @@ typedef enum
 /**
  * GBusNameOwnerFlags:
  * @G_BUS_NAME_OWNER_FLAGS_NONE: No flags set.
- * @G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT: Allow another message bus connection to claim the the name.
+ * @G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT: Allow another message bus connection to claim the name.
  * @G_BUS_NAME_OWNER_FLAGS_REPLACE: If another message bus connection owns the name and have
  * specified #G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT, then take the name from the other connection.
  *
@@ -1355,10 +1355,11 @@ typedef enum
  *     to the #GApplication::command-line signal handler, via
  *     g_application_command_line_getenv().
  * @G_APPLICATION_NON_UNIQUE: Make no attempts to do any of the typical
- *     single-instance application negotiation.  The application neither
- *     attempts to become the owner of the application ID nor does it
- *     check if an existing owner already exists.  Everything occurs in
- *     the local process.  Since: 2.30.
+ *     single-instance application negotiation, even if the application
+ *     ID is given.  The application neither attempts to become the
+ *     owner of the application ID nor does it check if an existing
+ *     owner already exists.  Everything occurs in the local process.
+ *     Since: 2.30.
  *
  * Flags used to define the behaviour of a #GApplication.
  *
@@ -1649,7 +1650,7 @@ typedef enum {
  * Since: 2.34
  */
 typedef enum /*< flags >*/ {
-  G_TEST_DBUS_NONE = 0,
+  G_TEST_DBUS_NONE = 0
 } GTestDBusFlags;
 
 G_END_DECLS

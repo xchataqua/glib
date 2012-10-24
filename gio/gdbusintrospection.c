@@ -1755,6 +1755,9 @@ parser_error (GMarkupParseContext *context,
  *
  * Parses @xml_data and returns a #GDBusNodeInfo representing the data.
  *
+ * The introspection XML must contain exactly one top-level
+ * <tag class="starttag">node</tag> element.
+ *
  * Note that this routine is using a
  * <link linkend="glib-Simple-XML-Subset-Parser.description">GMarkup</link>-based
  * parser that only accepts a subset of valid XML documents.
@@ -1814,11 +1817,8 @@ g_dbus_node_info_new_for_xml (const gchar  *xml_data,
       /* clean up */
       for (n = 0; n < num_nodes; n++)
         {
-          for (n = 0; n < num_nodes; n++)
-            {
-              g_dbus_node_info_unref (ughret[n]);
-              ughret[n] = NULL;
-            }
+          g_dbus_node_info_unref (ughret[n]);
+          ughret[n] = NULL;
         }
     }
 
@@ -1843,7 +1843,7 @@ g_dbus_node_info_new_for_xml (const gchar  *xml_data,
  *
  * Looks up the value of an annotation.
  *
- * This cost of this function is O(n) in number of annotations.
+ * The cost of this function is O(n) in number of annotations.
  *
  * Returns: The value or %NULL if not found. Do not free, it is owned by @annotations.
  *
@@ -1910,7 +1910,7 @@ static GHashTable *info_cache = NULL;
  *
  * Looks up information about a method.
  *
- * This cost of this function is O(n) in number of methods unless
+ * The cost of this function is O(n) in number of methods unless
  * g_dbus_interface_info_cache_build() has been used on @info.
  *
  * Returns: (transfer none): A #GDBusMethodInfo or %NULL if not found. Do not free, it is owned by @info.
@@ -1964,7 +1964,7 @@ g_dbus_interface_info_lookup_method (GDBusInterfaceInfo *info,
  *
  * Looks up information about a signal.
  *
- * This cost of this function is O(n) in number of signals unless
+ * The cost of this function is O(n) in number of signals unless
  * g_dbus_interface_info_cache_build() has been used on @info.
  *
  * Returns: (transfer none): A #GDBusSignalInfo or %NULL if not found. Do not free, it is owned by @info.
@@ -2018,7 +2018,7 @@ g_dbus_interface_info_lookup_signal (GDBusInterfaceInfo *info,
  *
  * Looks up information about a property.
  *
- * This cost of this function is O(n) in number of properties unless
+ * The cost of this function is O(n) in number of properties unless
  * g_dbus_interface_info_cache_build() has been used on @info.
  *
  * Returns: (transfer none): A #GDBusPropertyInfo or %NULL if not found. Do not free, it is owned by @info.
@@ -2161,7 +2161,7 @@ g_dbus_interface_info_cache_release (GDBusInterfaceInfo *info)
  *
  * Looks up information about an interface.
  *
- * This cost of this function is O(n) in number of interfaces.
+ * The cost of this function is O(n) in number of interfaces.
  *
  * Returns: (transfer none): A #GDBusInterfaceInfo or %NULL if not found. Do not free, it is owned by @info.
  *

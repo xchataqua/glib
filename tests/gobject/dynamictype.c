@@ -110,10 +110,9 @@ module_register (GTypeModule *module)
 static void
 test_dynamic_type (void)
 {
-  GTypeModule *module;
   DynamicObjectClass *class;
 
-  module = test_module_new (module_register);
+  test_module_new (module_register);
 
   /* Not loaded until we call ref for the first time */
   class = g_type_class_peek (DYNAMIC_OBJECT_TYPE);
@@ -165,7 +164,6 @@ main (int   argc,
   g_log_set_always_fatal (g_log_set_always_fatal (G_LOG_FATAL_MASK) |
 			  G_LOG_LEVEL_WARNING |
 			  G_LOG_LEVEL_CRITICAL);
-  g_type_init ();
 
   test_dynamic_type ();
   

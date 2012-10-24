@@ -35,9 +35,9 @@
  * @see_also: #GTlsConnection
  *
  * A certificate used for TLS authentication and encryption.
- * This can represent either a public key only (eg, the certificate
+ * This can represent either a certificate only (eg, the certificate
  * received by a client from a server), or the combination of
- * a public key and a private key (which is needed when acting as a
+ * a certificate and a private key (which is needed when acting as a
  * #GTlsServerConnection).
  *
  * Since: 2.28
@@ -98,10 +98,9 @@ g_tls_certificate_class_init (GTlsCertificateClass *class)
   /**
    * GTlsCertificate:certificate:
    *
-   * The DER (binary) encoded representation of the certificate's
-   * public key. This property and the
-   * #GTlsCertificate:certificate-pem property represent the same
-   * data, just in different forms.
+   * The DER (binary) encoded representation of the certificate.
+   * This property and the #GTlsCertificate:certificate-pem property
+   * represent the same data, just in different forms.
    *
    * Since: 2.28
    */
@@ -116,8 +115,8 @@ g_tls_certificate_class_init (GTlsCertificateClass *class)
   /**
    * GTlsCertificate:certificate-pem:
    *
-   * The PEM (ASCII) encoded representation of the certificate's
-   * public key. This property and the #GTlsCertificate:certificate
+   * The PEM (ASCII) encoded representation of the certificate.
+   * This property and the #GTlsCertificate:certificate
    * property represent the same data, just in different forms.
    *
    * Since: 2.28
@@ -559,4 +558,41 @@ g_tls_certificate_verify (GTlsCertificate     *cert,
 			  GTlsCertificate     *trusted_ca)
 {
   return G_TLS_CERTIFICATE_GET_CLASS (cert)->verify (cert, identity, trusted_ca);
+}
+
+/**
+ * g_tls_certificate_is_same:
+ * @cert_one: first certificate to compare
+ * @cert_two: second certificate to compare
+ *
+ * Check if two #GTlsCertificate objects represent the same certificate.
+ * The raw DER byte data of the two certificates are checked for equality.
+ * This has the effect that two certificates may compare equal even if
+ * their #GTlsCertificate:issuer, #GTlsCertificate:private-key, or
+ * #GTlsCertificate:private-key-pem properties differ.
+ *
+ * Return value: whether the same or not
+ *
+ * Since: 2.34
+ */
+gboolean
+g_tls_certificate_is_same (GTlsCertificate     *cert_one,
+                           GTlsCertificate     *cert_two)
+{
+  GByteArray *b1, *b2;
+  gboolean equal;
+
+  g_return_val_if_fail (G_IS_TLS_CERTIFICATE (cert_one), FALSE);
+  g_return_val_if_fail (G_IS_TLS_CERTIFICATE (cert_two), FALSE);
+
+  g_object_get (cert_one, "certificate", &b1, NULL);
+  g_object_get (cert_two, "certificate", &b2, NULL);
+
+  equal = (b1->len == b2->len &&
+           memcmp (b1->data, b2->data, b1->len) == 0);
+
+  g_byte_array_unref (b1);
+  g_byte_array_unref (b2);
+
+  return equal;
 }

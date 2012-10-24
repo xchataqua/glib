@@ -90,8 +90,16 @@ struct _GApplicationClass
   void                      (* run_mainloop)        (GApplication              *application);
   void                      (* shutdown)            (GApplication              *application);
 
+  gboolean                  (* dbus_register)       (GApplication              *application,
+                                                     GDBusConnection           *connection,
+                                                     const gchar               *object_path,
+                                                     GError                   **error);
+  void                      (* dbus_unregister)     (GApplication              *application,
+                                                     GDBusConnection           *connection,
+                                                     const gchar               *object_path);
+
   /*< private >*/
-  gpointer padding[11];
+  gpointer padding[9];
 };
 
 GType                   g_application_get_type                          (void) G_GNUC_CONST;
@@ -104,6 +112,11 @@ GApplication *          g_application_new                               (const g
 const gchar *           g_application_get_application_id                (GApplication             *application);
 void                    g_application_set_application_id                (GApplication             *application,
                                                                          const gchar              *application_id);
+
+GLIB_AVAILABLE_IN_2_34
+GDBusConnection *       g_application_get_dbus_connection               (GApplication             *application);
+GLIB_AVAILABLE_IN_2_34
+const gchar *           g_application_get_dbus_object_path              (GApplication             *application);
 
 guint                   g_application_get_inactivity_timeout            (GApplication             *application);
 void                    g_application_set_inactivity_timeout            (GApplication             *application,
@@ -140,7 +153,9 @@ int                     g_application_run                               (GApplic
 
 void                    g_application_quit                              (GApplication             *application);
 
+GLIB_AVAILABLE_IN_2_32
 GApplication *          g_application_get_default                       (void);
+GLIB_AVAILABLE_IN_2_32
 void                    g_application_set_default                       (GApplication             *application);
 
 G_END_DECLS
