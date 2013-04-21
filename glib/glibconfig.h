@@ -54,9 +54,9 @@ typedef unsigned long long guint64;
 
 #define G_GINT64_CONSTANT(val)	(val##L)
 #define G_GUINT64_CONSTANT(val)	(val##UL)
-#define G_GINT64_MODIFIER "l"
-#define G_GINT64_FORMAT "li"
-#define G_GUINT64_FORMAT "lu"
+#define G_GINT64_MODIFIER "ll"
+#define G_GINT64_FORMAT "lli"
+#define G_GUINT64_FORMAT "llu"
 
 #define GLIB_SIZEOF_VOID_P 8
 #define GLIB_SIZEOF_LONG   8
